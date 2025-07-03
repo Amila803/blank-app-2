@@ -55,7 +55,58 @@ def load_data():
 
 data = load_data()
 
+# Add this right after your data loading section
+# --------------------------------------------------
+# Accommodation Type Analysis
+st.header("🏨 Accommodation Type Relationships")
+
+# Calculate average costs by accommodation type
+accom_type_analysis = data.groupby('AccommodationType')['AccommodationCost'].agg(['mean', 'count']).sort_values('mean')
+st.dataframe(accom_type_analysis.style.format("{:.2f}"))
+
+# Visualize the cost relationships
+fig, ax = plt.subplots(figsize=(10, 6))
+sns.boxplot(
+    data=data, 
+    x='AccommodationType', 
+    y='AccommodationCost',
+    order=accom_type_analysis.index,  # Sorted from cheapest to most expensive
+    palette="Blues",
+    ax=ax
+)
+ax.set_title("Cost Distribution by Accommodation Type")
+ax.set_ylabel("Daily Cost ($)")
+ax.set_xlabel("")
+plt.xticks(rotation=45)
+st.pyplot(fig)
+
+# Define accommodation type multipliers (adjust these based on your data)
+ACCOM_MODIFIERS = {
+    'Hostel': 0.7,    # Cheapest
+    'Airbnb': 0.9,
+    'Hotel': 1.0,      # Baseline
+    'Villa': 1.3,
+    'Resort': 1.5      # Most expensive
+}
+
+
+def calculate_accommodation_cost(row):
+    base_cost = BASE_COSTS[row['Destination']]
+    duration = row['Duration']
+    accom_modifier = ACCOM_MODIFIERS[row['AccommodationType']]
+    peak_season = 1.2 if row['IsPeakSeason'] else 1.0
+    weekend = 1.1 if row['IsWeekend'] else 1.0
+    
+    # Calculate final cost with all factors
+    return base_cost * duration * accom_modifier * peak_season * weekend * np.random.normal(1, 0.1)
+
+data['AccommodationCost'] = data.apply(calculate_accommodation_cost, axis=1)
+# --------------------------------------------------
+
+# Then modify your model training section to use these relationships:
+# In your model training pipeline, ensure 'AccommodationType' is included as a feature
 # Feature Engineering
+
 def engineer_features(df):
     df = df.copy()
     # Extract date features
@@ -345,7 +396,6 @@ if submitted:
 st.header("💵 Combined Cost Prediction")
 
 # Use your existing accommodation form inputs
-# Add this after your accommodation prediction:
 if 'accom_pred' in locals() and submitted:
     total_cost = accom_pred + pred_cost
     st.success(f"## Total Estimated Trip Cost: ${total_cost:.2f}")
