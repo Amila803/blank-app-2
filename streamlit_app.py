@@ -18,23 +18,26 @@ st.markdown("Predict your travel costs based on destination, duration, and other
 # Load the pre-trained model from the model folder
 @st.cache_resource
 def load_model():
-    try:
-        model_path = os.path.join('model', 'travel_cost_predictor.pkl')
-        with open(model_path, 'rb') as f:
-            model = pickle.load(f)
+    from pathlib import Path
+    import joblib, traceback
 
-        
-        # Verify model has required methods
-        if not all(hasattr(model, m) for m in ['predict_accommodation', 'predict_transportation']):
-            st.error("Model missing required prediction methods!")
-            return None
-            
+    model_path = Path(__file__).parent / "models" / "trip_cost_forecast_model.pkl"
+
+    st.write("🔍 Trying to load model from:", model_path)
+    if not model_path.exists():
+        st.error(f"❌ Model file not found at {model_path}")
+        return None
+
+    try:
+        model = joblib.load(model_path)
+        st.write("✅ Loaded model:", type(model))
         return model
-    except FileNotFoundError:
-        st.error(f"Model file not found at: {model_path}")
+
     except Exception as e:
-        st.error(f"Error loading model: {str(e)}")
-    return None
+        st.error("❌ Error loading model – full traceback below")
+        st.exception(e)
+        return None
+
 
 model = load_model()
 
