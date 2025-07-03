@@ -50,10 +50,10 @@ def load_data():
         (1 + 0.1 * data['StartDate'].dt.dayofweek.isin([4,5])))  # Weekend markup
 
     accommodation_factors = {
-    'Hostel': 0.5,    # cheapest
-    'Hotel': 1.5,     # mid-range
-    'Airbnb': 1.0,    # slightly below hotel
-    'Resort': 2.0     # priciest
+    'Hostel': 0.2,    # cheapest
+    'Hotel': 1.0,     # mid-range
+    'Airbnb': 0.8,    # slightly below hotel
+    'Resort': 1.5     # priciest
     }
 
     data['AccomFactor'] = data['AccommodationType'].map(accommodation_factors)
