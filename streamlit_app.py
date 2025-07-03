@@ -48,6 +48,22 @@ def load_data():
         data['Destination'].map(base_costs) * data['Duration'] *  # Base cost * duration
         (1 + 0.2 * data['StartDate'].dt.month.isin([6,7,8,12])) *  # Peak season markup
         (1 + 0.1 * data['StartDate'].dt.dayofweek.isin([4,5])))  # Weekend markup
+
+    accommodation_factors = {
+    'Hostel': 0.5,    # cheapest
+    'Hotel': 1.0,     # mid-range
+    'Airbnb': 0.8,    # slightly below hotel
+    'Resort': 1.5     # priciest
+    }
+
+    data['AccomFactor'] = data['AccommodationType'].map(accommodation_factors)
+    data['Cost'] = (
+    data['Destination'].map(base_costs)
+    * data['Duration']
+    * (1 + 0.2 * data['StartDate'].dt.month.isin([6,7,8,12]))
+    * (1 + 0.1 * data['StartDate'].dt.dayofweek.isin([4,5]))
+    * data['AccomFactor']
+    )
     
     # Add some noise
     data['Cost'] = data['Cost'] * np.random.normal(1, 0.1, n_samples)
@@ -277,7 +293,7 @@ with st.form("prediction_form"):
         is_weekend = 1 if day_of_week >= 5 else 0
         is_peak_season = 1 if month in [6,7,8,12] else 0
     
-    submitted = st.form_submit_button("Predict Cost")
+    submitted = st.form_submit_button("Calculate Accommodation Cost")
 
 if submitted:
     try:
