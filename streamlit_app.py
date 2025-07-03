@@ -13,7 +13,7 @@ import joblib
 from datetime import datetime
 
 # Set page config
-st.set_page_config(page_title="Enhanced Travel Cost Predictor", page_icon="✈️", layout="wide")
+st.set_page_config(page_title="Travel Cost Predictor", page_icon="✈️", layout="wide")
 
 # Title and description
 st.title("✈️ Travel Cost Predictor")
