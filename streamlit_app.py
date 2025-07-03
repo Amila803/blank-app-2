@@ -16,7 +16,7 @@ from datetime import datetime
 st.set_page_config(page_title="Enhanced Travel Cost Predictor", page_icon="✈️", layout="wide")
 
 # Title and description
-st.title("✈️ Enhanced Travel Cost Predictor")
+st.title("✈️ Travel Cost Predictor")
 st.markdown("""
 This app predicts travel costs with improved date and duration relationships.
 """)
