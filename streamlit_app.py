@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import pickle
 import os
 from datetime import datetime
 import matplotlib.pyplot as plt
@@ -14,30 +13,23 @@ st.set_page_config(page_title="Travel Cost Predictor", page_icon="✈️", layou
 st.title("✈️ Travel Cost Predictor")
 st.markdown("Predict your travel costs based on destination, duration, and other factors.")
 
-
-# Load the pre-trained model from the model folder
+# Load the pre-trained model
 @st.cache_resource
 def load_model():
-    from pathlib import Path
-    import joblib, traceback
-
-    model_path = Path(__file__).parent / "models" / "trip_cost_forecast_model.pkl"
-
-    st.write("🔍 Trying to load model from:", model_path)
-    if not model_path.exists():
-        st.error(f"❌ Model file not found at {model_path}")
-        return None
-
     try:
+        model_path = Path(__file__).parent / "models" / "travel_cost_predictor.pkl"
+        
+        if not model_path.exists():
+            st.error(f"❌ Model file not found at {model_path}")
+            return None
+            
         model = joblib.load(model_path)
-        st.write("✅ Loaded model:", type(model))
+        st.success("✅ Model loaded successfully!")
         return model
-
+        
     except Exception as e:
-        st.error("❌ Error loading model – full traceback below")
-        st.exception(e)
+        st.error(f"❌ Error loading model: {str(e)}")
         return None
-
 
 model = load_model()
 
@@ -87,34 +79,17 @@ if submitted and model is not None:
         
         input_df = pd.DataFrame(input_data)
         
-        # Make predictions
-        # imagine you did joblib.dump({'accommodation': ac_pipe,
-        #                             'transportation': tr_pipe}, …)
-        model_dict = pickle.load(f)
-        
-        accommodation_cost = model_dict['accommodation'].predict(input_df)[0]
-        transportation_cost = model_dict['transportation'].predict(input_df)[0]
-
-
-        total_cost = accommodation_cost + transportation_cost
+        # Make prediction (assuming model predicts total cost directly)
+        predicted_cost = model.predict(input_df)[0]
         
         # Display results
         st.success("### Cost Estimation Results")
+        st.metric("Total Estimated Cost", f"${predicted_cost:,.2f}")
         
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Accommodation Cost", f"${accommodation_cost:,.2f}")
-        with col2:
-            st.metric("Transportation Cost", f"${transportation_cost:,.2f}")
-        with col3:
-            st.metric("Total Estimated Cost", f"${total_cost:,.2f}", delta_color="off")
-        
-        # Cost breakdown chart
+        # Optional: Add more visualizations if your model provides breakdown
         st.subheader("Cost Breakdown")
         fig, ax = plt.subplots(figsize=(8, 4))
-        costs = [accommodation_cost, transportation_cost]
-        labels = ['Accommodation', 'Transportation']
-        ax.bar(labels, costs, color=['#1f77b4', '#ff7f0e'])
+        ax.bar(["Total Cost"], [predicted_cost], color='#1f77b4')
         ax.set_ylabel('USD')
         st.pyplot(fig)
         
