@@ -313,7 +313,7 @@ if submitted:
     except Exception as e:
         st.error(f"Prediction failed: {str(e)}")
 
-# Prediction interface
+# Transport Prediction interface
 with st.form("transport_form"):
     st.subheader("Calculate Transportation Costs")
     
@@ -338,6 +338,8 @@ if submitted:
     pred_cost = transport_model.predict(input_data)[0]
     
     st.success(f"### Estimated Transportation Cost: ${pred_cost:.2f}")
+    st.session_state['trans_pred'] = pred_cost
+
     
     # Show cost factors
     st.write("**Cost Factors:**")
@@ -351,9 +353,9 @@ if submitted:
 # --- INTEGRATION WITH ACCOMMODATION MODEL ---
 st.header("💵 Combined Cost Prediction")
 
-# Use your existing accommodation form inputs
-if 'accom_pred' in locals() and submitted:
-    total_cost = accom_pred + pred_cost
+if 'accom_pred' in st.session_state and 'trans_pred' in st.session_state:
+    total_cost = st.session_state['accom_pred'] + st.session_state['trans_pred']
     st.success(f"## Total Estimated Trip Cost: ${total_cost:.2f}")
-    st.write(f"- Accommodation: ${accom_pred:.2f}")
-    st.write(f"- Transportation: ${pred_cost:.2f}")
+    st.write(f"- Accommodation: ${st.session_state['accom_pred']:.2f}")
+    st.write(f"- Transportation: ${st.session_state['trans_pred']:.2f}")
+
