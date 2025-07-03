@@ -21,7 +21,7 @@ st.markdown("""
 This app predicts travel costs with improved date and duration relationships.
 """)
 
-# LOAD SAMPLE DATA
+# Load or generate sample data
 @st.cache_data
 def load_data():
     # This is sample data - replace with your actual data
@@ -100,14 +100,6 @@ with col2:
     monthly_avg = engineered_data.groupby('Month')['Cost'].mean()
     fig, ax = plt.subplots()
     monthly_avg.plot(kind='bar', ax=ax)
-    st.pyplot(fig)
-
-with col3:
-    st.subheader("Average Cost by Accommodation")
-    accom_avg = engineered_data.groupby('AccommodationType')['Cost'].mean().sort_values()
-    fig, ax = plt.subplots()
-    accom_avg.plot(kind='bar', ax=ax)
-    ax.set_ylabel("Average Cost")
     st.pyplot(fig)
 
 # --- TRANSPORTATION COST PREDICTION ---
@@ -374,4 +366,3 @@ if 'accom_pred' in st.session_state and 'trans_pred' in st.session_state:
     st.success(f"## Total Estimated Trip Cost: ${total_cost:.2f}")
     st.write(f"- Accommodation: ${st.session_state['accom_pred']:.2f}")
     st.write(f"- Transportation: ${st.session_state['trans_pred']:.2f}")
-
