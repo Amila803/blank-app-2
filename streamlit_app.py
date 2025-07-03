@@ -38,7 +38,7 @@ def load_data():
         'Destination': np.random.choice(destinations, n_samples),
         'Duration': np.random.randint(1, 30, n_samples),
         'StartDate': pd.to_datetime(np.random.choice(pd.date_range('2023-01-01', '2023-12-31'), n_samples)),
-        'AccommodationType': np.random.choice(['Hotel', 'Airbnb', 'Resort'], n_samples),
+        'AccommodationType': np.random.choice(['Hotel', 'Airbnb', 'Resort', 'Hostel'], n_samples),
         'TravelerNationality': np.random.choice(['American', 'British', 'Canadian'], n_samples)
     })
     
