@@ -343,11 +343,17 @@ if submitted:
         st.warning("Limited train options in Bali - consider flights or car rental")
 
 # --- INTEGRATION WITH ACCOMMODATION MODEL ---
-st.header("💵 Combined Cost Prediction")
+with st.form("prediction_form"):
+    # [Your form inputs here...]
+    submitted = st.form_submit_button("Calculate Total Cost")
 
-# Use your existing accommodation form inputs
-if 'accom_pred' in locals() and submitted:
-    total_cost = accom_pred + pred_cost
-    st.success(f"## Total Estimated Trip Cost: ${total_cost:.2f}")
-    st.write(f"- Accommodation: ${accom_pred:.2f}")
-    st.write(f"- Transportation: ${pred_cost:.2f}")
+if submitted:
+    # Calculate both predictions
+    accom_pred = 500  # Replace with actual model prediction
+    trans_pred = 300   # Replace with actual model prediction
+    total = accom_pred + trans_pred
+    
+    # Display - this will definitely show
+    st.write(f"Accommodation: ${accom_pred}")
+    st.write(f"Transportation: ${trans_pred}")
+    st.success(f"TOTAL TRIP COST: ${total}")
