@@ -209,3 +209,145 @@ if submitted:
             
     except Exception as e:
         st.error(f"Prediction failed: {str(e)}")
+
+# Add this section to your existing code (after accommodation model)
+
+# --- TRANSPORTATION COST PREDICTION ---
+st.header("🚆 Transportation Cost Prediction")
+
+# Transportation type options
+TRANSPORT_TYPES = ['Flight', 'Train', 'Bus', 'Car rental']
+NATIONALITIES = ['American', 'British', 'Canadian', 'Australian', 'Japanese']
+DESTINATIONS = ['London', 'Paris', 'Tokyo', 'New York', 'Bali']
+
+# Load/generate transportation data
+@st.cache_data
+def load_transport_data():
+    np.random.seed(42)
+    n_samples = 500
+    
+    # Base costs by destination and transport type
+    transport_costs = {
+        'London': {'Flight': 400, 'Train': 150, 'Bus': 80, 'Car rental': 200},
+        'Paris': {'Flight': 350, 'Train': 120, 'Bus': 60, 'Car rental': 180},
+        'Tokyo': {'Flight': 800, 'Train': 250, 'Bus': 100, 'Car rental': 300},
+        'New York': {'Flight': 500, 'Train': 100, 'Bus': 70, 'Car rental': 250},
+        'Bali': {'Flight': 700, 'Train': 50, 'Bus': 30, 'Car rental': 150}
+    }
+    
+    # Nationality preferences (multipliers)
+    nationality_factors = {
+        'American': {'Flight': 1.0, 'Car rental': 1.2},
+        'British': {'Train': 1.3, 'Flight': 1.1},
+        'Canadian': {'Flight': 1.1, 'Car rental': 1.1},
+        'Japanese': {'Train': 1.4, 'Bus': 1.2},
+        'Australian': {'Flight': 1.2, 'Car rental': 0.9}
+    }
+    
+    data = pd.DataFrame({
+        'Destination': np.random.choice(DESTINATIONS, n_samples),
+        'TransportType': np.random.choice(TRANSPORT_TYPES, n_samples),
+        'Nationality': np.random.choice(NATIONALITIES, n_samples),
+        'BaseCost': [transport_costs[d][t] for d,t in zip(
+            np.random.choice(DESTINATIONS, n_samples),
+            np.random.choice(TRANSPORT_TYPES, n_samples)
+        )],
+        'PeakSeason': np.random.choice([0,1], n_samples, p=[0.7,0.3])
+    })
+    
+    # Apply nationality preferences and peak season markup
+    data['TransportCost'] = data['BaseCost'] * \
+        [nationality_factors[row['Nationality']].get(row['TransportType'], 1.0) 
+         for _, row in data.iterrows()] * \
+        (1 + data['PeakSeason']*0.2)
+    
+    return data
+
+transport_data = load_transport_data()
+
+# Show transportation relationships
+st.subheader("Cost Patterns")
+col1, col2 = st.columns(2)
+with col1:
+    st.write("**Average Cost by Transport Type**")
+    fig, ax = plt.subplots()
+    sns.barplot(data=transport_data, x='TransportType', y='TransportCost', 
+                hue='Destination', ax=ax)
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
+
+with col2:
+    st.write("**Nationality Preferences**")
+    fig, ax = plt.subplots()
+    sns.countplot(data=transport_data, x='Nationality', hue='TransportType', ax=ax)
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
+
+# Train transportation model
+@st.cache_resource
+def train_transport_model():
+    # Feature engineering
+    X = transport_data[['Destination', 'TransportType', 'Nationality', 'PeakSeason']]
+    y = transport_data['TransportCost']
+    
+    # Preprocessing
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('cat', OneHotEncoder(), ['Destination', 'TransportType', 'Nationality'])
+        ])
+    
+    model = Pipeline([
+        ('preprocessor', preprocessor),
+        ('regressor', RandomForestRegressor(random_state=42))
+    ])
+    
+    model.fit(X, y)
+    return model
+
+transport_model = train_transport_model()
+
+# Prediction interface
+with st.form("transport_form"):
+    st.subheader("Calculate Transportation Costs")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        trans_destination = st.selectbox("Destination", DESTINATIONS, key='trans_dest')
+        trans_type = st.selectbox("Transportation Type", TRANSPORT_TYPES, key='trans_type')
+    with col2:
+        trans_nationality = st.selectbox("Nationality", NATIONALITIES, key='trans_nat')
+        is_peak = st.checkbox("Peak Season Travel", value=False)
+    
+    submitted = st.form_submit_button("Calculate Transport Cost")
+
+if submitted:
+    input_data = pd.DataFrame([{
+        'Destination': trans_destination,
+        'TransportType': trans_type,
+        'Nationality': trans_nationality,
+        'PeakSeason': int(is_peak)
+    }])
+    
+    pred_cost = transport_model.predict(input_data)[0]
+    
+    st.success(f"### Estimated Transportation Cost: ${pred_cost:.2f}")
+    
+    # Show cost factors
+    st.write("**Cost Factors:**")
+    if is_peak:
+        st.write("- 20% peak season surcharge applied")
+    if trans_nationality == 'Japanese' and trans_type == 'Train':
+        st.write("- Japanese travelers typically prefer trains (higher quality expectation)")
+    if trans_destination == 'Bali' and trans_type == 'Train':
+        st.warning("Limited train options in Bali - consider flights or car rental")
+
+# --- INTEGRATION WITH ACCOMMODATION MODEL ---
+st.header("💵 Combined Cost Prediction")
+
+# Use your existing accommodation form inputs
+# Add this after your accommodation prediction:
+if 'accom_pred' in locals() and submitted:
+    total_cost = accom_pred + pred_cost
+    st.success(f"## Total Estimated Trip Cost: ${total_cost:.2f}")
+    st.write(f"- Accommodation: ${accom_pred:.2f}")
+    st.write(f"- Transportation: ${pred_cost:.2f}")
