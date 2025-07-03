@@ -211,9 +211,10 @@ y = engineered_data[target]
 categorical_features = ['Destination', 'AccommodationType', 'TravelerNationality']
 numeric_features     = ['Duration', 'Month', 'IsWeekend', 'IsPeakSeason']
 preprocessor = ColumnTransformer([
-    ('num', StandardScaler(),        numeric_features),
-    ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features),
+    ('num', StandardScaler(),       ['Duration','Month','IsWeekend','IsPeakSeason']),
+    ('cat', OneHotEncoder(),        ['Destination','AccommodationType','TravelerNationality'])
 ])
+
 
 
 # Model pipeline
@@ -259,6 +260,16 @@ if st.button("Train Model"):
             ax.set_xlabel('Actual Cost')
             ax.set_ylabel('Predicted Cost')
             st.pyplot(fig)
+#Inspect
+rf = best_model.named_steps['regressor']
+ohe = best_model.named_steps['preprocessor'] \
+               .named_transformers_['cat'] \
+               .named_steps['onehot']
+feat_names = list(ohe.get_feature_names_out(['Destination','AccommodationType','TravelerNationality'])) \
+             + ['Duration','Month','IsWeekend','IsPeakSeason']
+imps = pd.Series(rf.feature_importances_, index=feat_names)
+st.subheader("Accommodation Effects Learned by the Model")
+st.bar_chart(imps.filter(like='AccommodationType_').sort_values())
 
 
 # Prediction Interface
