@@ -23,11 +23,6 @@ def load_model():
         with open(model_path, 'rb') as f:
             model = pickle.load(f)
 
-            st.write("Loaded model:", model)
-            st.write("Type:", type(model))
-            st.write("Has these methods:", [m for m in ['predict','predict_accommodation','predict_transportation']
-                                if hasattr(model, m)])
-
         
         # Verify model has required methods
         if not all(hasattr(model, m) for m in ['predict_accommodation', 'predict_transportation']):
