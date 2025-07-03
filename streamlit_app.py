@@ -15,6 +15,9 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import cross_val_score
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.model_selection import GridSearchCV
+from sklearn.linear_model import Ridge
+
 
 # Constants
 MODEL_PATH = Path(__file__).parent / "model" / "travel_cost_predictor.pkl"
@@ -201,7 +204,14 @@ def train_model():
     ]
     
     # Define meta-model
-    meta_model = LinearRegression()
+    meta_model = Ridge(random_state=42)
+    param_grid = {
+    # tune the Ridge alpha
+    'regressor__final_estimator__alpha': [0.1, 1.0, 10.0, 100.0],
+    # try with/without feeding the original features through to the meta-model
+    'regressor__passthrough': [True, False]
+    }
+
     
     # Create stacking ensemble
     stacked_model = Pipeline(steps=[
@@ -216,7 +226,43 @@ def train_model():
     
     # Train model
     with st.spinner("Training model (this may take a few minutes)..."):
-        stacked_model.fit(X, y)
+        # build the pipeline exactly as before
+        stacked_model = Pipeline(steps=[
+            ('preprocessor', preprocessor),
+            ('regressor', StackingRegressor(
+                estimators=base_models,
+                final_estimator=meta_model,
+                n_jobs=-1,
+                passthrough=True
+            ))
+        ])
+        
+        # grid‐search over just those two hyperparameters
+        grid = GridSearchCV(
+            estimator=stacked_model,
+            param_grid=param_grid,
+            cv=5,
+            scoring='neg_mean_absolute_error',
+            n_jobs=-1,
+            verbose=1
+        )
+        
+        with st.spinner("Tuning hyperparameters (this may take a few minutes)…"):
+            grid.fit(X, y)
+        
+        best_model = grid.best_estimator_
+        st.write("🔑 Best params:", grid.best_params_)
+
+        # evaluate on  CV folds again 
+        st.subheader("Tuned Model Performance")
+        evaluate_model(best_model, X, y)
+        
+        # overwrite the old model file
+        joblib.dump(best_model, MODEL_PATH)
+        st.success("✅ Tuned model trained and saved!")
+        return best_model
+
+
     
     # Evaluate model
     st.subheader("Model Evaluation")
