@@ -101,7 +101,17 @@ with col2:
     fig, ax = plt.subplots()
     monthly_avg.plot(kind='bar', ax=ax)
     st.pyplot(fig)
-
+    
+with col3:
+    st.subheader("Average Cost by Accommodation")
+    accom_avg = engineered_data.groupby('AccommodationType')['Cost']\
+                 .mean().sort_values()
+    fig, ax = plt.subplots()
+    accom_avg.plot(kind='bar', ax=ax)
+    ax.set_ylabel("Average Cost")
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
+    
 # --- TRANSPORTATION COST PREDICTION ---
 st.header("🚆 Transportation Cost Prediction")
 
