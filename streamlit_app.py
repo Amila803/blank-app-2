@@ -4,6 +4,8 @@ import pickle
 import os
 from datetime import datetime
 import matplotlib.pyplot as plt
+from pathlib import Path
+import joblib
 
 # Set page config
 st.set_page_config(page_title="Travel Cost Predictor", page_icon="✈️", layout="centered")
@@ -12,6 +14,17 @@ st.set_page_config(page_title="Travel Cost Predictor", page_icon="✈️", layou
 st.title("✈️ Travel Cost Predictor")
 st.markdown("Predict your travel costs based on destination, duration, and other factors.")
 
+class TravelCostPredictor:
+    def __init__(self, accommodation_model, transportation_model):
+        self.accom = accommodation_model
+        self.trans = transportation_model
+
+    def predict_accommodation(self, X):
+        return self.accom.predict(X)
+
+    def predict_transportation(self, X):
+        return self.trans.predict(X)
+
 # Load the pre-trained model from the model folder
 @st.cache_resource
 def load_model():
@@ -19,6 +32,12 @@ def load_model():
         model_path = os.path.join('model', 'travel_cost_predictor.pkl')
         with open(model_path, 'rb') as f:
             model = pickle.load(f)
+
+            st.write("Loaded model:", model)
+            st.write("Type:", type(model))
+            st.write("Has these methods:", [m for m in ['predict','predict_accommodation','predict_transportation']
+                                if hasattr(model, m)])
+
         
         # Verify model has required methods
         if not all(hasattr(model, m) for m in ['predict_accommodation', 'predict_transportation']):
@@ -81,8 +100,14 @@ if submitted and model is not None:
         input_df = pd.DataFrame(input_data)
         
         # Make predictions
-        accommodation_cost = model.predict_accommodation(input_df)[0]
-        transportation_cost = model.predict_transportation(input_df)[0]
+        # imagine you did joblib.dump({'accommodation': ac_pipe,
+        #                             'transportation': tr_pipe}, …)
+        model_dict = pickle.load(f)
+        
+        accommodation_cost = model_dict['accommodation'].predict(input_df)[0]
+        transportation_cost = model_dict['transportation'].predict(input_df)[0]
+
+
         total_cost = accommodation_cost + transportation_cost
         
         # Display results
