@@ -279,19 +279,25 @@ with st.form("prediction_form"):
     
     submitted = st.form_submit_button("Predict Cost")
 
-    if submit_accom:
+    if submitted:
+    try:
         model = joblib.load('travel_cost_model.pkl')
-        accom_input = pd.DataFrame([{ 
-            'Destination':       destination,
-            'Duration':          duration,
+        
+        input_data = pd.DataFrame([{
+            'Destination': destination,
+            'Duration': duration,
             'AccommodationType': accommodation,
             'TravelerNationality': nationality,
-            'Month':             month,
-            'IsWeekend':         is_weekend,
-            'IsPeakSeason':      is_peak_season
+            'Month': month,
+            'IsWeekend': is_weekend,
+            'IsPeakSeason': is_peak_season
         }])
-        st.session_state['accom_pred'] = model.predict(accom_input)[0]
-        st.success(f"Accommodation cost: ${st.session_state['accom_pred']:.2f}")
+        
+        prediction = model.predict(input_data)[0]
+        
+        st.success(f"## Predicted Cost: ${prediction:,.2f}")
+
+
         
         # Show cost breakdown
         st.subheader("Cost Breakdown")
