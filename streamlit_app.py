@@ -15,6 +15,8 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import cross_val_score
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.model_selection import GridSearchCV
+
 
 # Constants
 MODEL_PATH = 'travel_cost_model.joblib'
@@ -202,6 +204,33 @@ def train_model():
     
     # Define meta-model
     meta_model = LinearRegression()
+
+    param_grid = {
+    # Random Forest
+    'regressor__estimators__random_forest__n_estimators': [100, 200, 300],
+    'regressor__estimators__random_forest__max_depth': [10, 15, None],
+    'regressor__estimators__random_forest__min_samples_split': [2, 5, 10],
+
+    # SVR
+    'regressor__estimators__svr__C': [0.1, 1.0, 10.0],
+    'regressor__estimators__svr__epsilon': [0.01, 0.1, 1.0],
+
+    # Ridge
+    'regressor__estimators__ridge__alpha': [0.1, 1.0, 10.0],
+
+    # Meta-model (LinearRegression has no hyperparameters, but if you switch to Ridge for meta you could tune its alpha here)
+    # 'regressor__final_estimator__alpha': [0.1, 1.0, 10.0],
+}
+
+    Pipeline([
+    ('preprocessor', preprocessor),
+    ('regressor', StackingRegressor(
+        estimators=base_models,
+        final_estimator=meta_model,
+        passthrough=True
+    ))
+])
+
     
     # Create stacking ensemble
     stacked_model = Pipeline(steps=[
