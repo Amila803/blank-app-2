@@ -86,78 +86,6 @@ with col2:
     monthly_avg.plot(kind='bar', ax=ax)
     st.pyplot(fig)
 
-# Model Training
-st.header("Model Training")
-
-# Prepare features and target
-features = ['Destination', 'Duration', 'AccommodationType', 'TravelerNationality', 
-            'Month', 'IsWeekend', 'IsPeakSeason']
-target = 'Cost'
-
-X = engineered_data[features]
-y = engineered_data[target]
-
-# Preprocessing
-numeric_features = ['Duration']
-categorical_features = ['Destination', 'AccommodationType', 'TravelerNationality']
-
-numeric_transformer = Pipeline(steps=[
-    ('scaler', StandardScaler())
-])
-
-categorical_transformer = Pipeline(steps=[
-    ('onehot', OneHotEncoder(handle_unknown='ignore'))
-])
-
-preprocessor = ColumnTransformer(
-    transformers=[
-        ('num', numeric_transformer, numeric_features),
-        ('cat', categorical_transformer, categorical_features)
-    ])
-
-# Model pipeline
-model = Pipeline(steps=[
-    ('preprocessor', preprocessor),
-    ('regressor', RandomForestRegressor(random_state=42))
-])
-
-# Train model
-if st.button("Train Model"):
-    with st.spinner("Training model..."):
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        
-        # Hyperparameter tuning
-        param_grid = {
-            'regressor__n_estimators': [100, 200],
-            'regressor__max_depth': [None, 10, 20],
-            'regressor__min_samples_split': [2, 5]
-        }
-        
-        grid_search = GridSearchCV(model, param_grid, cv=5, scoring='neg_mean_squared_error')
-        grid_search.fit(X_train, y_train)
-        best_model = grid_search.best_estimator_
-        
-        # Save model
-        joblib.dump(best_model, 'travel_cost_model.pkl')
-        st.success("Model trained and saved!")
-
-        # Evaluation
-        st.subheader("Model Evaluation")
-        y_pred = best_model.predict(X_test)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("MAE", f"${mean_absolute_error(y_test, y_pred):.2f}")
-            st.metric("R² Score", f"{r2_score(y_test, y_pred):.2f}")
-        
-        with col2:
-            fig, ax = plt.subplots()
-            ax.scatter(y_test, y_pred, alpha=0.5)
-            ax.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
-            ax.set_xlabel('Actual Cost')
-            ax.set_ylabel('Predicted Cost')
-            st.pyplot(fig)
-
 # --- TRANSPORTATION COST PREDICTION ---
 st.header("🚆 Transportation Cost Prediction")
 
@@ -252,6 +180,81 @@ def train_transport_model():
     return model
 
 transport_model = train_transport_model()
+
+
+
+
+# Model Training
+st.header("Model Training")
+
+# Prepare features and target
+features = ['Destination', 'Duration', 'AccommodationType', 'TravelerNationality', 
+            'Month', 'IsWeekend', 'IsPeakSeason']
+target = 'Cost'
+
+X = engineered_data[features]
+y = engineered_data[target]
+
+# Preprocessing
+numeric_features = ['Duration']
+categorical_features = ['Destination', 'AccommodationType', 'TravelerNationality']
+
+numeric_transformer = Pipeline(steps=[
+    ('scaler', StandardScaler())
+])
+
+categorical_transformer = Pipeline(steps=[
+    ('onehot', OneHotEncoder(handle_unknown='ignore'))
+])
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', numeric_transformer, numeric_features),
+        ('cat', categorical_transformer, categorical_features)
+    ])
+
+# Model pipeline
+model = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('regressor', RandomForestRegressor(random_state=42))
+])
+
+# Train model
+if st.button("Train Model"):
+    with st.spinner("Training model..."):
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        
+        # Hyperparameter tuning
+        param_grid = {
+            'regressor__n_estimators': [100, 200],
+            'regressor__max_depth': [None, 10, 20],
+            'regressor__min_samples_split': [2, 5]
+        }
+        
+        grid_search = GridSearchCV(model, param_grid, cv=5, scoring='neg_mean_squared_error')
+        grid_search.fit(X_train, y_train)
+        best_model = grid_search.best_estimator_
+        
+        # Save model
+        joblib.dump(best_model, 'travel_cost_model.pkl')
+        st.success("Model trained and saved!")
+
+        # Evaluation
+        st.subheader("Model Evaluation")
+        y_pred = best_model.predict(X_test)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("MAE", f"${mean_absolute_error(y_test, y_pred):.2f}")
+            st.metric("R² Score", f"{r2_score(y_test, y_pred):.2f}")
+        
+        with col2:
+            fig, ax = plt.subplots()
+            ax.scatter(y_test, y_pred, alpha=0.5)
+            ax.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
+            ax.set_xlabel('Actual Cost')
+            ax.set_ylabel('Predicted Cost')
+            st.pyplot(fig)
 
 
 # Prediction Interface
