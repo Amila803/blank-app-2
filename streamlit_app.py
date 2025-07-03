@@ -88,7 +88,8 @@ engineered_data = engineer_features(data)
 
 # Show data relationships
 st.header("Data Relationships")
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
+
 with col1:
     st.subheader("Cost vs Duration")
     fig, ax = plt.subplots()
@@ -100,8 +101,9 @@ with col2:
     monthly_avg = engineered_data.groupby('Month')['Cost'].mean()
     fig, ax = plt.subplots()
     monthly_avg.plot(kind='bar', ax=ax)
+    ax.set_ylabel("Average Cost")
     st.pyplot(fig)
-    
+
 with col3:
     st.subheader("Average Cost by Accommodation")
     accom_avg = engineered_data.groupby('AccommodationType')['Cost']\
@@ -111,7 +113,7 @@ with col3:
     ax.set_ylabel("Average Cost")
     plt.xticks(rotation=45)
     st.pyplot(fig)
-    
+
 # --- TRANSPORTATION COST PREDICTION ---
 st.header("🚆 Transportation Cost Prediction")
 
