@@ -212,22 +212,13 @@ X = engineered_data[features]
 y = engineered_data[target]
 
 # Preprocessing
-numeric_features = ['Duration']
 categorical_features = ['Destination', 'AccommodationType', 'TravelerNationality']
-
-numeric_transformer = Pipeline(steps=[
-    ('scaler', StandardScaler())
+numeric_features     = ['Duration', 'Month', 'IsWeekend', 'IsPeakSeason']
+preprocessor = ColumnTransformer([
+    ('num', StandardScaler(),        numeric_features),
+    ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features),
 ])
 
-categorical_transformer = Pipeline(steps=[
-    ('onehot', OneHotEncoder(handle_unknown='ignore'))
-])
-
-preprocessor = ColumnTransformer(
-    transformers=[
-        ('num', numeric_transformer, numeric_features),
-        ('cat', categorical_transformer, categorical_features)
-    ])
 
 # Model pipeline
 model = Pipeline(steps=[
