@@ -335,59 +335,73 @@ def main():
             model = train_model()
         st.info("Click the button above to retrain the model with the latest data.")
 
-    # Load or train model
+    # Load (or train) your model once — it's cached by @st.cache_resource
     model = load_model()
     if model is None:
         st.error("Failed to initialize model. Cannot continue.")
         return
 
-    # Initialize flags so they exist even if the form isn't submitted
-    submitted = False
-    reset = False
+    # 1) Prepare default values in session_state (only on first run)
+    defaults = {
+        'nationality': NATIONALITIES[0],
+        'destination': DESTINATIONS[0],
+        'start_date': datetime.today(),
+        'duration': 7,
+        'accommodation': ACCOMMODATION_TYPES[0],
+        'transportation': TRANSPORTATION_TYPES[0]
+    }
+    for key, val in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = val
 
-    # Single form with both buttons
-    with st.form("travel_form"):
-        col1, col2 = st.columns(2)
-
-        with col1:
-            nationality    = st.selectbox('Your Nationality', NATIONALITIES, index=0)
-            destination    = st.selectbox('Destination', DESTINATIONS)
-            start_date     = st.date_input('Start Date', min_value=datetime.today())
-
-        with col2:
-            duration       = st.number_input('Duration (days)', min_value=1, max_value=90, value=7)
-            accommodation  = st.selectbox('Accommodation Type', ACCOMMODATION_TYPES)
-            transportation = st.selectbox('Transportation Type', TRANSPORTATION_TYPES)
-
-        # Two buttons in the same form
-        submitted = st.form_submit_button("Estimate Cost")
-        reset     = st.form_submit_button("Reset")
-
-    # Handle reset first
-    if reset:
+    # 2) Define a reset callback
+    def reset_form():
+        for key, val in defaults.items():
+            st.session_state[key] = val
+        # no need to clear the model—it's cached
         st.experimental_rerun()
 
-    # Only run prediction when the user clicked "Estimate Cost"
-    if submitted:
-        total_cost = predict_cost(
-            model, nationality, destination, start_date,
-            duration, accommodation, transportation
-        )
+    # 3) Build one form driven by those session_state keys
+    with st.form("travel_form"):
+        c1, c2 = st.columns(2)
+        with c1:
+            st.selectbox("Your Nationality",  NATIONALITIES, key="nationality")
+            st.selectbox("Destination",         DESTINATIONS,    key="destination")
+            st.date_input("Start Date", min_value=datetime.today(), key="start_date")
+        with c2:
+            st.number_input("Duration (days)",  min_value=1, max_value=90, value=7, key="duration")
+            st.selectbox("Accommodation Type",  ACCOMMODATION_TYPES, key="accommodation")
+            st.selectbox("Transportation Type", TRANSPORTATION_TYPES, key="transportation")
 
-        if total_cost is not None:
+        submitted = st.form_submit_button("Estimate Cost")
+        reset     = st.form_submit_button("Reset", on_click=reset_form)
+
+    # 4) Only when they click Estimate do we predict
+    if submitted:
+        total = predict_cost(
+            model,
+            st.session_state.nationality,
+            st.session_state.destination,
+            st.session_state.start_date,
+            st.session_state.duration,
+            st.session_state.accommodation,
+            st.session_state.transportation
+        )
+        if total is not None:
             st.subheader("Estimated Cost")
-            st.metric("Total Estimated Cost", f"${total_cost:,.2f}")
-            st.write("**Estimated Cost Breakdown:**")
+            st.metric("Total", f"${total:,.2f}")
             c1, c2 = st.columns(2)
             with c1:
-                st.metric("Accommodation", f"${total_cost * 0.7:,.2f}")
+                st.metric("Accommodation", f"${total * 0.7:,.2f}")
             with c2:
-                st.metric("Transportation", f"${total_cost * 0.3:,.2f}")
+                st.metric("Transportation", f"${total * 0.3:,.2f}")
 
-            if nationality == destination:
-                st.info("This is a domestic trip (same nationality and destination)")
-            else:
-                st.info("This is an international trip")
+            info_msg = (
+                "This is a domestic trip"
+                if st.session_state.nationality == st.session_state.destination
+                else "This is an international trip"
+            )
+            st.info(info_msg)
 
 if __name__ == '__main__':
     main()
