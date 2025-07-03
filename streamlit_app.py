@@ -380,7 +380,7 @@ def main():
                 st.info("This is an international trip")
 
         with st.form("travel_form"):
-        col1, col2 = st.columns(2)
+            col1, col2 = st.columns(2)
 
         with col1:
             nationality = st.selectbox('Your Nationality', NATIONALITIES, index=0)
