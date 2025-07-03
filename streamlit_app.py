@@ -250,6 +250,28 @@ if st.button("Train Model"):
         st.subheader("Model Evaluation")
         y_pred = best_model.predict(X_test)
         
+        # --- inspect learned accommodation effects ---
+        st.subheader("Learned Accommodation Impact on Cost")
+    
+        # grab the fitted RandomForest
+        rf = best_model.named_steps['regressor']
+    
+        
+        numeric_features     = ['Duration']
+        categorical_features = ['Destination', 'AccommodationType', 'TravelerNationality']
+        ohe = best_model.named_steps['preprocessor'] \
+                       .named_transformers_['cat'] \
+                       .named_steps['onehot']
+        ohe_feats = ohe.get_feature_names_out(categorical_features)
+        all_feats = list(ohe_feats) + numeric_features
+    
+        # pull importances and plot those related to accommodation
+        importances = pd.Series(rf.feature_importances_, index=all_feats)
+        accom_imps = importances.filter(like='AccommodationType_') \
+                                .sort_values(ascending=False)
+    
+        st.bar_chart(accom_imps)
+
         col1, col2 = st.columns(2)
         with col1:
             st.metric("MAE", f"${mean_absolute_error(y_test, y_pred):.2f}")
