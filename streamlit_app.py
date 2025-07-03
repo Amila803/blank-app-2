@@ -358,8 +358,7 @@ def main():
     def reset_form():
         for key, val in defaults.items():
             st.session_state[key] = val
-        # no need to clear the model—it's cached
-        st.experimental_rerun()
+      
 
     # 3) Build one form driven by those session_state keys
     with st.form("travel_form"):
