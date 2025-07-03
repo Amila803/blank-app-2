@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import pickle
+import os
 from datetime import datetime
 import matplotlib.pyplot as plt
 
@@ -12,16 +12,32 @@ st.set_page_config(page_title="Travel Cost Predictor", page_icon="✈️", layou
 st.title("✈️ Travel Cost Predictor")
 st.markdown("Predict your travel costs based on destination, duration, and other factors.")
 
-# Load the pre-trained model
+# Load the pre-trained model from the model folder
 @st.cache_resource
 def load_model():
-    with open('travel_cost_predictor.pkl', 'rb') as f:
-        model = pickle.load(f)
-    return model
+    try:
+        model_path = os.path.join('model', 'travel_cost_predictor.pkl')
+        with open(model_path, 'rb') as f:
+            model = pickle.load(f)
+        
+        # Verify model has required methods
+        if not all(hasattr(model, m) for m in ['predict_accommodation', 'predict_transportation']):
+            st.error("Model missing required prediction methods!")
+            return None
+            
+        return model
+    except FileNotFoundError:
+        st.error(f"Model file not found at: {model_path}")
+    except Exception as e:
+        st.error(f"Error loading model: {str(e)}")
+    return None
 
 model = load_model()
 
-# Define possible options (should match your training data)
+if model is None:
+    st.stop()  # Don't proceed if model failed to load
+
+# Define possible options
 NATIONALITIES = ['American', 'British', 'Canadian', 'Australian', 'Japanese', 'Chinese', 'Indian', 'German']
 DESTINATIONS = ['London', 'Paris', 'Tokyo', 'New York', 'Bali', 'Sydney', 'Bangkok', 'Rome']
 ACCOMMODATION_TYPES = ['Hotel', 'Airbnb', 'Resort', 'Hostel', 'Villa']
@@ -49,22 +65,22 @@ if reset:
     st.experimental_rerun()
 
 # Prediction logic
-if submitted:
-    # Prepare input data (must match training data format)
-    input_data = {
-        'Destination': [destination],
-        'Traveler nationality': [nationality],
-        'Duration (days)': [days],
-        'Accommodation type': [accommodation_type],
-        'Transportation type': [transportation_type],
-        'Start month': [start_date.month],
-        'Is_peak_season': [1 if start_date.month in [6, 7, 8, 12] else 0]
-    }
-    
-    input_df = pd.DataFrame(input_data)
-    
-    # Make predictions
+if submitted and model is not None:
     try:
+        # Prepare input data
+        input_data = {
+            'Destination': [destination],
+            'Traveler nationality': [nationality],
+            'Duration (days)': [days],
+            'Accommodation type': [accommodation_type],
+            'Transportation type': [transportation_type],
+            'Start month': [start_date.month],
+            'Is_peak_season': [1 if start_date.month in [6, 7, 8, 12] else 0]
+        }
+        
+        input_df = pd.DataFrame(input_data)
+        
+        # Make predictions
         accommodation_cost = model.predict_accommodation(input_df)[0]
         transportation_cost = model.predict_transportation(input_df)[0]
         total_cost = accommodation_cost + transportation_cost
@@ -90,5 +106,5 @@ if submitted:
         st.pyplot(fig)
         
     except Exception as e:
-        st.error(f"Error making prediction: {str(e)}")
-        st.info("Please ensure your model expects the same features as the input data.")
+        st.error(f"Prediction failed: {str(e)}")
+        st.code("Please check if your input data matches the model's training format")
