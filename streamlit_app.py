@@ -158,63 +158,9 @@ if st.button("Train Model"):
             ax.set_ylabel('Predicted Cost')
             st.pyplot(fig)
 
-# Prediction Interface
-st.header("Cost Prediction")
-
-with st.form("prediction_form"):
-    st.subheader("Enter Trip Details")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        destination = st.selectbox("Destination", data['Destination'].unique())
-        duration = st.number_input("Duration (days)", min_value=1, max_value=90, value=7)
-        accommodation = st.selectbox("Accommodation Type", data['AccommodationType'].unique())
-        nationality = st.selectbox("Nationality", data['TravelerNationality'].unique())
-    
-    with col2:
-        start_date = st.date_input("Start Date", datetime.today())
-        month = start_date.month
-        day_of_week = start_date.weekday()  # Monday=0, Sunday=6
-        is_weekend = 1 if day_of_week >= 5 else 0
-        is_peak_season = 1 if month in [6,7,8,12] else 0
-    
-    submitted = st.form_submit_button("Predict Cost")
-
-if submitted:
-    try:
-        model = joblib.load('travel_cost_model.pkl')
-        
-        input_data = pd.DataFrame([{
-            'Destination': destination,
-            'Duration': duration,
-            'AccommodationType': accommodation,
-            'TravelerNationality': nationality,
-            'Month': month,
-            'IsWeekend': is_weekend,
-            'IsPeakSeason': is_peak_season
-        }])
-        
-        prediction = model.predict(input_data)[0]
-        
-        st.success(f"## Predicted Cost: ${prediction:,.2f}")
-        
-        # Show cost breakdown
-        st.subheader("Cost Breakdown")
-        base_cost = prediction / duration
-        st.write(f"Base daily cost: ${base_cost:,.2f}")
-        st.write(f"Total for {duration} days: ${base_cost * duration:,.2f}")
-        
-        if is_peak_season:
-            st.write("⚠️ Peak season surcharge applied")
-        if is_weekend:
-            st.write("⚠️ Weekend surcharge applied")
-            
-    except Exception as e:
-        st.error(f"Prediction failed: {str(e)}")
-
-
 # --- TRANSPORTATION COST PREDICTION ---
 st.header("🚆 Transportation Cost Prediction")
+
 
 # Transportation type options
 TRANSPORT_TYPES = ['Flight', 'Train', 'Bus', 'Car rental']
@@ -306,6 +252,62 @@ def train_transport_model():
     return model
 
 transport_model = train_transport_model()
+
+
+# Prediction Interface
+st.header("Cost Prediction")
+
+with st.form("prediction_form"):
+    st.subheader("Enter Trip Details")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        destination = st.selectbox("Destination", data['Destination'].unique())
+        duration = st.number_input("Duration (days)", min_value=1, max_value=90, value=7)
+        accommodation = st.selectbox("Accommodation Type", data['AccommodationType'].unique())
+        nationality = st.selectbox("Nationality", data['TravelerNationality'].unique())
+    
+    with col2:
+        start_date = st.date_input("Start Date", datetime.today())
+        month = start_date.month
+        day_of_week = start_date.weekday()  # Monday=0, Sunday=6
+        is_weekend = 1 if day_of_week >= 5 else 0
+        is_peak_season = 1 if month in [6,7,8,12] else 0
+    
+    submitted = st.form_submit_button("Predict Cost")
+
+if submitted:
+    try:
+        model = joblib.load('travel_cost_model.pkl')
+        
+        input_data = pd.DataFrame([{
+            'Destination': destination,
+            'Duration': duration,
+            'AccommodationType': accommodation,
+            'TravelerNationality': nationality,
+            'Month': month,
+            'IsWeekend': is_weekend,
+            'IsPeakSeason': is_peak_season
+        }])
+        
+        prediction = model.predict(input_data)[0]
+        
+        st.success(f"## Predicted Cost: ${prediction:,.2f}")
+        
+        # Show cost breakdown
+        st.subheader("Cost Breakdown")
+        base_cost = prediction / duration
+        st.write(f"Base daily cost: ${base_cost:,.2f}")
+        st.write(f"Total for {duration} days: ${base_cost * duration:,.2f}")
+        
+        if is_peak_season:
+            st.write("⚠️ Peak season surcharge applied")
+        if is_weekend:
+            st.write("⚠️ Weekend surcharge applied")
+            
+    except Exception as e:
+        st.error(f"Prediction failed: {str(e)}")
+
 
 # Prediction interface
 with st.form("transport_form"):
