@@ -1,406 +1,210 @@
 import streamlit as st
 import pandas as pd
-import joblib
-from datetime import datetime
-from pathlib import Path
-import os
-import sys
-import re
 import numpy as np
-from sklearn.ensemble import RandomForestRegressor, StackingRegressor
-from sklearn.linear_model import LinearRegression, Ridge
-from sklearn.svm import SVR
-from sklearn.preprocessing import OneHotEncoder
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import cross_val_score
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import GridSearchCV
-from sklearn.linear_model import Ridge
+import joblib
+from datetime import datetime
 
+# Set page config
+st.set_page_config(page_title="Enhanced Travel Cost Predictor", page_icon="✈️", layout="wide")
 
-# Constants
-MODEL_PATH = Path(__file__).parent / "model" / "travel_cost_predictor.pkl"
-BASE_DIR = Path(__file__).parent
-DATA_PATH = BASE_DIR / "data" / "Travel_details_dataset.csv"
+# Title and description
+st.title("✈️ Enhanced Travel Cost Predictor")
+st.markdown("""
+This app predicts travel costs with improved date and duration relationships.
+""")
 
-# Destination list extracted from the dataset
-DESTINATIONS = [
-    'London', 'Phuket', 'Bali', 'New York', 'Tokyo', 'Paris', 'Sydney',
-    'Rio de Janeiro', 'Amsterdam', 'Dubai', 'Cancun', 'Barcelona',
-    'Honolulu', 'Berlin', 'Marrakech', 'Edinburgh', 'Rome', 'Bangkok',
-    'Cape Town', 'Vancouver', 'Seoul', 'Los Angeles', 'Santorini',
-    'Phnom Penh', 'Athens', 'Auckland'
-]
-
-# Nationality list extracted from the dataset
-NATIONALITIES = sorted(list(set([
-    'American', 'Canadian', 'Korean', 'British', 'Vietnamese', 'Australian',
-    'Brazilian', 'Dutch', 'Emirati', 'Mexican', 'Spanish', 'Chinese',
-    'German', 'Moroccan', 'Scottish', 'Indian', 'Italian', 'South Korean',
-    'Taiwanese', 'South African', 'French', 'Japanese', 'Cambodia', 'Greece',
-    'United Arab Emirates', 'Hong Kong', 'Singapore', 'Indonesia', 'USA',
-    'UK', 'China', 'New Zealander'
-])))
-
-ACCOMMODATION_TYPES = [
-    'Hotel', 'Resort', 'Villa', 'Airbnb', 'Hostel', 'Riad',
-    'Guesthouse', 'Vacation rental'
-]
-
-TRANSPORTATION_TYPES = [
-    'Flight', 'Train', 'Plane', 'Bus', 'Car rental', 'Subway',
-    'Ferry', 'Car', 'Airplane'
-]
-
-def clean_cost(value):
-    """Clean cost values that might contain currency symbols, commas, or text"""
-    if pd.isna(value):
-        return np.nan
-    if isinstance(value, str):
-        # Remove currency symbols and text like 'USD'
-        cleaned = re.sub(r'[^\d.]', '', value.split('USD')[0].strip())
-        return float(cleaned) if cleaned else np.nan
-    return float(value)
-
-def clean_destination(dest):
-    """Clean destination names by extracting the main location"""
-    if pd.isna(dest):
-        return np.nan
-    dest = str(dest).split(',')[0].strip()
-    # Handle special cases
-    if dest == 'New York City':
-        return 'New York'
-    elif dest == 'Sydney, Aus' or dest == 'Sydney, AUS':
-        return 'Sydney'
-    elif dest == 'Bangkok, Thai':
-        return 'Bangkok'
-    elif dest == 'Phuket, Thai':
-        return 'Phuket'
-    elif dest == 'Cape Town, SA':
-        return 'Cape Town'
-    return dest
-
+# Load or generate sample data
+@st.cache_data
 def load_data():
-    """Load the dataset with file upload fallback"""
-    if DATA_PATH.exists():
-        df = pd.read_csv(DATA_PATH, encoding='utf-8-sig')
-    else:
-        upload = st.file_uploader("Upload Travel_details_dataset.csv", type="csv")
-        if upload:
-            df = pd.read_csv(upload)
-        else:
-            st.warning("Please upload the dataset to continue")
-            st.stop()
+    # This is sample data - replace with your actual data
+    # Generating synthetic data with clear relationships
+    np.random.seed(42)
+    n_samples = 1000
     
-    # Basic data validation
-    df.columns = df.columns.str.strip()
-    if "Destination" not in df.columns:
-        st.error("Column `Destination` not found. Available: " + ", ".join(df.columns))
-        st.stop()
+    # Base cost relationships
+    destinations = ['London', 'Paris', 'Tokyo', 'New York', 'Bali']
+    base_costs = {'London': 150, 'Paris': 130, 'Tokyo': 200, 'New York': 180, 'Bali': 120}
     
-    with st.expander("📋 Show sample data"):
-        st.dataframe(df.head(10))
-    
-    return df
-
-def preprocess_data(df):
-    """Preprocess the loaded dataset"""
-    # Data cleaning - remove empty rows
-    df = df.dropna(how='all')
-    
-    # Clean cost columns
-    df['Accommodation cost'] = df['Accommodation cost'].apply(clean_cost)
-    df['Transportation cost'] = df['Transportation cost'].apply(clean_cost)
-    
-    # Calculate total cost
-    df['Total cost'] = df['Accommodation cost'] + df['Transportation cost']
-    
-    # Clean and standardize columns
-    df['Destination'] = df['Destination'].apply(clean_destination)
-    df['Traveler nationality'] = df['Traveler nationality'].str.split().str[0].str.strip()
-    df['Accommodation type'] = df['Accommodation type'].str.strip()
-    df['Transportation type'] = df['Transportation type'].str.strip().replace({
-        'Plane': 'Flight',
-        'Airplane': 'Flight'
+    # Create DataFrame
+    data = pd.DataFrame({
+        'Destination': np.random.choice(destinations, n_samples),
+        'Duration': np.random.randint(1, 30, n_samples),
+        'StartDate': pd.to_datetime(np.random.choice(pd.date_range('2023-01-01', '2023-12-31'), n_samples)),
+        'AccommodationType': np.random.choice(['Hotel', 'Airbnb', 'Resort'], n_samples),
+        'TravelerNationality': np.random.choice(['American', 'British', 'Canadian'], n_samples)
     })
     
-    # Date handling
-    df['Start date'] = pd.to_datetime(df['Start date'], errors='coerce')
-    df['End date'] = pd.to_datetime(df['End date'], errors='coerce')
-    df = df.dropna(subset=['Start date', 'End date'])
+    # Calculate cost with clear relationships
+    data['Cost'] = (
+        data['Destination'].map(base_costs) * data['Duration'] *  # Base cost * duration
+        (1 + 0.2 * (data['StartDate'].dt.month.isin([6,7,8,12])) *  # Peak season markup
+        (1 + 0.1 * (data['StartDate'].dt.dayofweek.isin([4,5])))  # Weekend markup
     
-    # Feature engineering
-    df['Year'] = df['Start date'].dt.year
-    df['Month'] = df['Start date'].dt.month
-    df['Season'] = df['Start date'].dt.month % 12 // 3 + 1
-    df['Duration (days)'] = (df['End date'] - df['Start date']).dt.days
-    
-    # Additional features
-    df['Is_peak_season'] = df['Month'].isin([6, 7, 8, 12]).astype(int)
-    df['Is_long_trip'] = (df['Duration (days)'] > 14).astype(int)
-    df['Is_domestic'] = (df['Traveler nationality'] == df['Destination']).astype(int)
-    
-    # Select features and target
-    features = ['Destination', 'Traveler nationality', 'Duration (days)', 
-               'Accommodation type', 'Transportation type', 'Year', 
-               'Month', 'Season', 'Is_peak_season', 'Is_long_trip', 'Is_domestic']
-    target = 'Total cost'
-    
-    # Final cleaning
-    df = df.dropna(subset=features + [target])
-    df = df[(df['Total cost'] > 0) & (df['Total cost'] < 50000)]
-    df = df[(df['Duration (days)'] > 0) & (df['Duration (days)'] <= 90)]
-    
-    return df[features], df[target]
+    # Add some noise
+    data['Cost'] = data['Cost'] * np.random.normal(1, 0.1, n_samples)
+    return data.round(2)
 
-def evaluate_model(model, X, y):
-    """Evaluate model performance using cross-validation"""
-    try:
-        scores = cross_val_score(model, X, y, cv=5, scoring='neg_mean_absolute_error')
-        mae_scores = -scores
-        st.write(f"Mean Absolute Error (CV): ${mae_scores.mean():.2f} (± {mae_scores.std():.2f})")
-        
-        scores = cross_val_score(model, X, y, cv=5, scoring='r2')
-        st.write(f"R² Score (CV): {scores.mean():.2f} (± {scores.std():.2f})")
-    except Exception as e:
-        st.warning(f"Could not perform cross-validation: {str(e)}")
+data = load_data()
 
-def train_model():
-    df = load_data()
-    X, y = preprocess_data(df)
-    
-    if X is None or y is None:
-        st.error("Cannot train model due to data issues.")
-        return None
-        
-    categorical_features = ['Destination', 'Traveler nationality', 'Accommodation type', 'Transportation type']
-    numerical_features = ['Duration (days)', 'Year', 'Month', 'Season', 'Is_peak_season', 'Is_long_trip', 'Is_domestic']
-    
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features),
-            ('num', 'passthrough', numerical_features)
-        ])
-    
-    # Define base models for stacking
-    base_models = [
-        ('random_forest', RandomForestRegressor(
-            n_estimators=200, 
-            max_depth=15,
-            min_samples_split=5,
-            random_state=42,
-            n_jobs=-1
-        )),
-        ('svr', SVR(
-            kernel='rbf',
-            C=1.0,
-            epsilon=0.1
-        )),
-        ('ridge', Ridge(
-            alpha=1.0,
-            random_state=42
-        ))
-    ]
-    
-    # Define meta-model
-    meta_model = Ridge(random_state=42)
-    param_grid = {
-    # tune the Ridge alpha
-    'regressor__final_estimator__alpha': [0.1, 1.0, 10.0, 100.0],
-    # try with/without feeding the original features through to the meta-model
-    'regressor__passthrough': [True, False]
-    }
+# Feature Engineering
+def engineer_features(df):
+    df = df.copy()
+    # Extract date features
+    df['Year'] = df['StartDate'].dt.year
+    df['Month'] = df['StartDate'].dt.month
+    df['DayOfWeek'] = df['StartDate'].dt.dayofweek  # Monday=0, Sunday=6
+    df['IsWeekend'] = df['DayOfWeek'].isin([5,6]).astype(int)
+    df['IsPeakSeason'] = df['Month'].isin([6,7,8,12]).astype(int)
+    return df
 
-    
-    # Create stacking ensemble
-    stacked_model = Pipeline(steps=[
-        ('preprocessor', preprocessor),
-        ('regressor', StackingRegressor(
-            estimators=base_models,
-            final_estimator=meta_model,
-            n_jobs=-1,
-            passthrough=True
-        ))
+engineered_data = engineer_features(data)
+
+# Show data relationships
+st.header("Data Relationships")
+col1, col2 = st.columns(2)
+with col1:
+    st.subheader("Cost vs Duration")
+    fig, ax = plt.subplots()
+    sns.regplot(data=engineered_data, x='Duration', y='Cost', ax=ax)
+    st.pyplot(fig)
+
+with col2:
+    st.subheader("Average Cost by Month")
+    monthly_avg = engineered_data.groupby('Month')['Cost'].mean()
+    fig, ax = plt.subplots()
+    monthly_avg.plot(kind='bar', ax=ax)
+    st.pyplot(fig)
+
+# Model Training
+st.header("Model Training")
+
+# Prepare features and target
+features = ['Destination', 'Duration', 'AccommodationType', 'TravelerNationality', 
+            'Month', 'IsWeekend', 'IsPeakSeason']
+target = 'Cost'
+
+X = engineered_data[features]
+y = engineered_data[target]
+
+# Preprocessing
+numeric_features = ['Duration']
+categorical_features = ['Destination', 'AccommodationType', 'TravelerNationality']
+
+numeric_transformer = Pipeline(steps=[
+    ('scaler', StandardScaler())
+])
+
+categorical_transformer = Pipeline(steps=[
+    ('onehot', OneHotEncoder(handle_unknown='ignore'))
+])
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', numeric_transformer, numeric_features),
+        ('cat', categorical_transformer, categorical_features)
     ])
+
+# Model pipeline
+model = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('regressor', RandomForestRegressor(random_state=42))
+])
+
+# Train model
+if st.button("Train Model"):
+    with st.spinner("Training model..."):
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        
+        # Hyperparameter tuning
+        param_grid = {
+            'regressor__n_estimators': [100, 200],
+            'regressor__max_depth': [None, 10, 20],
+            'regressor__min_samples_split': [2, 5]
+        }
+        
+        grid_search = GridSearchCV(model, param_grid, cv=5, scoring='neg_mean_squared_error')
+        grid_search.fit(X_train, y_train)
+        best_model = grid_search.best_estimator_
+        
+        # Save model
+        joblib.dump(best_model, 'travel_cost_model.pkl')
+        st.success("Model trained and saved!")
+
+        # Evaluation
+        st.subheader("Model Evaluation")
+        y_pred = best_model.predict(X_test)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("MAE", f"${mean_absolute_error(y_test, y_pred):.2f}")
+            st.metric("R² Score", f"{r2_score(y_test, y_pred):.2f}")
+        
+        with col2:
+            fig, ax = plt.subplots()
+            ax.scatter(y_test, y_pred, alpha=0.5)
+            ax.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
+            ax.set_xlabel('Actual Cost')
+            ax.set_ylabel('Predicted Cost')
+            st.pyplot(fig)
+
+# Prediction Interface
+st.header("Cost Prediction")
+
+with st.form("prediction_form"):
+    st.subheader("Enter Trip Details")
     
-    # Train model
-    with st.spinner("Training model (this may take a few minutes)..."):
-        # build the pipeline exactly as before
-        stacked_model = Pipeline(steps=[
-            ('preprocessor', preprocessor),
-            ('regressor', StackingRegressor(
-                estimators=base_models,
-                final_estimator=meta_model,
-                n_jobs=-1,
-                passthrough=True
-            ))
-        ])
-        
-        # grid‐search over just those two hyperparameters
-        grid = GridSearchCV(
-            estimator=stacked_model,
-            param_grid=param_grid,
-            cv=5,
-            scoring='neg_mean_absolute_error',
-            n_jobs=-1,
-            verbose=1
-        )
-        
-        with st.spinner("Tuning hyperparameters (this may take a few minutes)…"):
-            grid.fit(X, y)
-        
-        best_model = grid.best_estimator_
-        st.write("🔑 Best params:", grid.best_params_)
-
-        # evaluate on  CV folds again 
-        st.subheader("Tuned Model Performance")
-        evaluate_model(best_model, X, y)
-        
-        # overwrite the old model file
-        joblib.dump(best_model, MODEL_PATH)
-        st.success("✅ Tuned model trained and saved!")
-        return best_model
-
-
+    col1, col2 = st.columns(2)
+    with col1:
+        destination = st.selectbox("Destination", data['Destination'].unique())
+        duration = st.number_input("Duration (days)", min_value=1, max_value=90, value=7)
+        accommodation = st.selectbox("Accommodation Type", data['AccommodationType'].unique())
+        nationality = st.selectbox("Nationality", data['TravelerNationality'].unique())
     
-    # Evaluate model
-    st.subheader("Model Evaluation")
-    evaluate_model(stacked_model, X, y)
-    
-    try:
-        joblib.dump(stacked_model, MODEL_PATH)
-        st.success("Model trained and saved successfully!")
-    except Exception as e:
-        st.error(f"Error saving model: {str(e)}")
-        
-    return stacked_model
-
-def load_model():
-    if not os.path.exists(MODEL_PATH):
-        st.warning("Model file not found. Training a new model...")
-        return train_model()
-        
-    try:
-        return joblib.load(MODEL_PATH)
-    except Exception as e:
-        st.error(f"Error loading model: {str(e)}")
-        st.warning("Attempting to train a new model...")
-        return train_model()
-
-def predict_cost(model, nationality, destination, start_date, duration, accommodation, transportation):
-    if model is None:
-        st.error("Cannot make predictions - no model available")
-        return None
-        
-    try:
-        # Calculate additional features
+    with col2:
+        start_date = st.date_input("Start Date", datetime.today())
         month = start_date.month
-        season = (month % 12) // 3 + 1
-        is_peak_season = 1 if month in [6, 7, 8, 12] else 0
-        is_long_trip = 1 if duration > 14 else 0
-        is_domestic = 1 if nationality == destination else 0
+        day_of_week = start_date.weekday()  # Monday=0, Sunday=6
+        is_weekend = 1 if day_of_week >= 5 else 0
+        is_peak_season = 1 if month in [6,7,8,12] else 0
+    
+    submitted = st.form_submit_button("Predict Cost")
+
+if submitted:
+    try:
+        model = joblib.load('travel_cost_model.pkl')
         
-        # Standardize transportation type
-        transportation = 'Flight' if transportation in ['Plane', 'Airplane'] else transportation
-        
-        input_data = pd.DataFrame({
-            'Destination': [destination],
-            'Traveler nationality': [nationality],
-            'Duration (days)': [duration],
-            'Accommodation type': [accommodation],
-            'Transportation type': [transportation],
-            'Year': [start_date.year],
-            'Month': [month],
-            'Season': [season],
-            'Is_peak_season': [is_peak_season],
-            'Is_long_trip': [is_long_trip],
-            'Is_domestic': [is_domestic]
-        })
+        input_data = pd.DataFrame([{
+            'Destination': destination,
+            'Duration': duration,
+            'AccommodationType': accommodation,
+            'TravelerNationality': nationality,
+            'Month': month,
+            'IsWeekend': is_weekend,
+            'IsPeakSeason': is_peak_season
+        }])
         
         prediction = model.predict(input_data)[0]
-        return round(prediction, 2)
+        
+        st.success(f"## Predicted Cost: ${prediction:,.2f}")
+        
+        # Show cost breakdown
+        st.subheader("Cost Breakdown")
+        base_cost = prediction / duration
+        st.write(f"Base daily cost: ${base_cost:,.2f}")
+        st.write(f"Total for {duration} days: ${base_cost * duration:,.2f}")
+        
+        if is_peak_season:
+            st.write("⚠️ Peak season surcharge applied")
+        if is_weekend:
+            st.write("⚠️ Weekend surcharge applied")
+            
     except Exception as e:
-        st.error(f"Prediction error: {str(e)}")
-        return None
-
-def main():
-    st.title('Travel Cost Estimator')
-    st.write("Estimate the total cost of your trip based on your nationality, destination, dates, and accommodation type.")
-
-    # Sidebar for model management
-    with st.sidebar:
-        st.header("Model Management")
-        if st.button("Retrain Model"):
-            model = train_model()
-        st.info("Click the button above to retrain the model with the latest data.")
-
-    # Load (or train) your model once — it's cached by @st.cache_resource
-    model = load_model()
-    if model is None:
-        st.error("Failed to initialize model. Cannot continue.")
-        return
-
-    # 1) Prepare default values in session_state (only on first run)
-    defaults = {
-        'nationality': NATIONALITIES[0],
-        'destination': DESTINATIONS[0],
-        'start_date': datetime.today(),
-        'duration': 7,
-        'accommodation': ACCOMMODATION_TYPES[0],
-        'transportation': TRANSPORTATION_TYPES[0]
-    }
-    for key, val in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = val
-
-    # 2) Define a reset callback
-    def reset_form():
-        for key, val in defaults.items():
-            st.session_state[key] = val
-      
-
-    # 3) Build one form driven by those session_state keys
-    with st.form("travel_form"):
-        c1, c2 = st.columns(2)
-        with c1:
-            st.selectbox("Your Nationality",  NATIONALITIES, key="nationality")
-            st.selectbox("Destination",         DESTINATIONS,    key="destination")
-            st.date_input("Start Date", min_value=datetime.today(), key="start_date")
-        with c2:
-            st.number_input("Duration (days)",  min_value=1, max_value=90, value=7, key="duration")
-            st.selectbox("Accommodation Type",  ACCOMMODATION_TYPES, key="accommodation")
-            st.selectbox("Transportation Type", TRANSPORTATION_TYPES, key="transportation")
-
-        submitted = st.form_submit_button("Estimate Cost")
-        reset     = st.form_submit_button("Reset", on_click=reset_form)
-
-    # 4) Only when they click Estimate do we predict
-    if submitted:
-        total = predict_cost(
-            model,
-            st.session_state.nationality,
-            st.session_state.destination,
-            st.session_state.start_date,
-            st.session_state.duration,
-            st.session_state.accommodation,
-            st.session_state.transportation
-        )
-        if total is not None:
-            st.subheader("Estimated Cost")
-            st.metric("Total", f"${total:,.2f}")
-            c1, c2 = st.columns(2)
-            with c1:
-                st.metric("Accommodation", f"${total * 0.7:,.2f}")
-            with c2:
-                st.metric("Transportation", f"${total * 0.3:,.2f}")
-
-            info_msg = (
-                "This is a domestic trip"
-                if st.session_state.nationality == st.session_state.destination
-                else "This is an international trip"
-            )
-            st.info(info_msg)
-
-if __name__ == '__main__':
-    main()
+        st.error(f"Prediction failed: {str(e)}")
