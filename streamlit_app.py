@@ -327,78 +327,67 @@ def predict_cost(model, nationality, destination, start_date, duration, accommod
 def main():
     st.title('Travel Cost Estimator')
     st.write("Estimate the total cost of your trip based on your nationality, destination, dates, and accommodation type.")
-    
+
     # Sidebar for model management
     with st.sidebar:
         st.header("Model Management")
         if st.button("Retrain Model"):
             model = train_model()
         st.info("Click the button above to retrain the model with the latest data.")
-    
+
     # Load or train model
     model = load_model()
-    
     if model is None:
         st.error("Failed to initialize model. Cannot continue.")
         return
-    
+
+    # Initialize flags so they exist even if the form isn't submitted
+    submitted = False
+    reset = False
+
+    # Single form with both buttons
     with st.form("travel_form"):
         col1, col2 = st.columns(2)
-        
+
         with col1:
-            nationality = st.selectbox('Your Nationality', NATIONALITIES, index=0)
-            destination = st.selectbox('Destination', DESTINATIONS)
-            start_date = st.date_input('Start Date', min_value=datetime.today())
-        
+            nationality    = st.selectbox('Your Nationality', NATIONALITIES, index=0)
+            destination    = st.selectbox('Destination', DESTINATIONS)
+            start_date     = st.date_input('Start Date', min_value=datetime.today())
+
         with col2:
-            duration = st.number_input('Duration (days)', min_value=1, max_value=90, value=7)
-            accommodation = st.selectbox('Accommodation Type', ACCOMMODATION_TYPES)
+            duration       = st.number_input('Duration (days)', min_value=1, max_value=90, value=7)
+            accommodation  = st.selectbox('Accommodation Type', ACCOMMODATION_TYPES)
             transportation = st.selectbox('Transportation Type', TRANSPORTATION_TYPES)
-        
+
+        # Two buttons in the same form
         submitted = st.form_submit_button("Estimate Cost")
-    
+        reset     = st.form_submit_button("Reset")
+
+    # Handle reset first
+    if reset:
+        st.experimental_rerun()
+
+    # Only run prediction when the user clicked "Estimate Cost"
     if submitted:
         total_cost = predict_cost(
-            model, nationality, destination, start_date, duration, accommodation, transportation
+            model, nationality, destination, start_date,
+            duration, accommodation, transportation
         )
-        
+
         if total_cost is not None:
             st.subheader("Estimated Cost")
-            st.metric(label="Total Estimated Cost", value=f"${total_cost:,.2f}")
-            
+            st.metric("Total Estimated Cost", f"${total_cost:,.2f}")
             st.write("**Estimated Cost Breakdown:**")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric(label="Accommodation", value=f"${total_cost * 0.7:,.2f}")
-            with col2:
-                st.metric(label="Transportation", value=f"${total_cost * 0.3:,.2f}")
-            
-            # Show if this is a domestic trip
+            c1, c2 = st.columns(2)
+            with c1:
+                st.metric("Accommodation", f"${total_cost * 0.7:,.2f}")
+            with c2:
+                st.metric("Transportation", f"${total_cost * 0.3:,.2f}")
+
             if nationality == destination:
                 st.info("This is a domestic trip (same nationality and destination)")
             else:
                 st.info("This is an international trip")
-
-        with st.form("travel_form"):
-            col1, col2 = st.columns(2)
-
-        with col1:
-            nationality = st.selectbox('Your Nationality', NATIONALITIES, index=0)
-            destination = st.selectbox('Destination', DESTINATIONS)
-            start_date = st.date_input('Start Date', min_value=datetime.today())
-
-        with col2:
-            duration = st.number_input('Duration (days)', min_value=1, max_value=90, value=7)
-            accommodation = st.selectbox('Accommodation Type', ACCOMMODATION_TYPES)
-            transportation = st.selectbox('Transportation Type', TRANSPORTATION_TYPES)
-
-        submitted = st.form_submit_button("Estimate Cost")
-        reset     = st.form_submit_button("Reset")   # ← add this
-
-    # if they hit Reset, just rerun the script (clears all inputs)
-    if reset:
-        st.experimental_rerun()
-
 
 if __name__ == '__main__':
     main()
