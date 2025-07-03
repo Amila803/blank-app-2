@@ -17,7 +17,7 @@ from sklearn.model_selection import cross_val_score
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 # Constants
-MODEL_PATH = 'travel_cost_model.joblib'
+MODEL_PATH = Path(__file__).parent / "model" / "travel_cost_predictor.pkl"
 BASE_DIR = Path(__file__).parent
 DATA_PATH = BASE_DIR / "data" / "Travel_details_dataset.csv"
 
