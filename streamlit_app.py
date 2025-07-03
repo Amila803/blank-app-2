@@ -296,6 +296,8 @@ if submitted:
         prediction = model.predict(input_data)[0]
         
         st.success(f"## Predicted Cost: ${prediction:,.2f}")
+        st.session_state['accom_pred'] = prediction
+
         
         # Show cost breakdown
         st.subheader("Cost Breakdown")
