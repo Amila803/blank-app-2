@@ -379,5 +379,26 @@ def main():
             else:
                 st.info("This is an international trip")
 
+        with st.form("travel_form"):
+        col1, col2 = st.columns(2)
+
+        with col1:
+            nationality = st.selectbox('Your Nationality', NATIONALITIES, index=0)
+            destination = st.selectbox('Destination', DESTINATIONS)
+            start_date = st.date_input('Start Date', min_value=datetime.today())
+
+        with col2:
+            duration = st.number_input('Duration (days)', min_value=1, max_value=90, value=7)
+            accommodation = st.selectbox('Accommodation Type', ACCOMMODATION_TYPES)
+            transportation = st.selectbox('Transportation Type', TRANSPORTATION_TYPES)
+
+        submitted = st.form_submit_button("Estimate Cost")
+        reset     = st.form_submit_button("Reset")   # ← add this
+
+    # if they hit Reset, just rerun the script (clears all inputs)
+    if reset:
+        st.experimental_rerun()
+
+
 if __name__ == '__main__':
     main()
