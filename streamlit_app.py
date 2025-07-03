@@ -14,16 +14,6 @@ st.set_page_config(page_title="Travel Cost Predictor", page_icon="✈️", layou
 st.title("✈️ Travel Cost Predictor")
 st.markdown("Predict your travel costs based on destination, duration, and other factors.")
 
-class TravelCostPredictor:
-    def __init__(self, accommodation_model, transportation_model):
-        self.accom = accommodation_model
-        self.trans = transportation_model
-
-    def predict_accommodation(self, X):
-        return self.accom.predict(X)
-
-    def predict_transportation(self, X):
-        return self.trans.predict(X)
 
 # Load the pre-trained model from the model folder
 @st.cache_resource
