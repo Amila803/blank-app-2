@@ -24,6 +24,7 @@ This app predicts travel costs with enforced business rules:
 1. More days = higher cost
 2. Resort is most expensive accommodation
 3. Hostel is cheapest accommodation
+4. Flight is most expensive transportation
 """)
 
 # Custom constrained model class
@@ -47,7 +48,7 @@ class ConstrainedRandomForest(BaseEstimator, RegressorMixin):
             bootstrap=bootstrap,
             random_state=random_state
         )
-        # Define accommodation weights (can be modified)
+        # Define accommodation weights
         self.accommodation_weights = {
             'Hostel': 0.8,  # 20% cheaper than average
             'Airbnb': 0.95,
@@ -129,7 +130,9 @@ def load_data():
             'Plane': 'Flight',
             'Airplane': 'Flight',
             'Car': 'Car rental',
-            'Subway': 'Train'
+            'Subway': 'Train',
+            'Bus': 'Bus',
+            'Ferry': 'Ferry'
         }
         data['Transportation type'] = data['Transportation type'].replace(transport_mapping)
         
@@ -196,7 +199,54 @@ if data is not None:
 
     engineered_data = engineer_features(data)
 
-    # Prepare features and target
+    # --- Transportation Model ---
+    @st.cache_resource
+    def train_transport_model():
+        transport_data = data[['Destination', 'TransportType', 'TravelerNationality', 'TransportCost', 'StartDate']].copy()
+        transport_data['PeakSeason'] = pd.to_datetime(transport_data['StartDate']).dt.month.isin([6,7,8,12]).astype(int)
+        
+        X = transport_data[['Destination', 'TransportType', 'TravelerNationality', 'PeakSeason']]
+        y = transport_data['TransportCost']
+        
+        preprocessor = ColumnTransformer(
+            transformers=[
+                ('cat', OneHotEncoder(handle_unknown='ignore'), ['Destination', 'TransportType', 'TravelerNationality'])
+            ])
+        
+        model = Pipeline([
+          ('preprocessor', preprocessor),
+          ('regressor', LGBMRegressor(
+              n_estimators=500,
+              learning_rate=0.05,
+              max_depth=10,
+              random_state=42,
+              n_jobs=-1
+          ))
+        ])
+        
+        model.fit(X, y)
+        return model
+
+    transport_model = train_transport_model()
+
+    # Show transportation relationships
+    st.subheader("Transportation Cost Patterns")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("**Average Cost by Transport Type**")
+        fig, ax = plt.subplots()
+        sns.barplot(data=data, x='TransportType', y='TransportCost', ax=ax)
+        plt.xticks(rotation=45)
+        st.pyplot(fig)
+
+    with col2:
+        st.write("**Transportation Type Distribution**")
+        fig, ax = plt.subplots()
+        sns.countplot(data=data, x='TransportType', ax=ax)
+        plt.xticks(rotation=45)
+        st.pyplot(fig)
+
+    # --- Accommodation Model ---
     features = ['Destination', 'Duration', 'AccommodationType', 'TravelerNationality', 
                 'Month', 'IsWeekend', 'IsPeakSeason']
     target = 'Cost'
@@ -214,7 +264,7 @@ if data is not None:
 
     # Model training section
     st.header("Model Training")
-    if st.button("Train Model"):
+    if st.button("Train Accommodation Model"):
         with st.spinner("Training model with constraints..."):
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             
@@ -244,7 +294,7 @@ if data is not None:
             best_model = search.best_estimator_
             
             joblib.dump(best_model, 'travel_cost_model.pkl')
-            st.success("Model trained and saved with constraints!")
+            st.success("Accommodation model trained and saved with constraints!")
             
             # Evaluation
             st.subheader("Model Evaluation")
@@ -311,21 +361,21 @@ if data is not None:
             else:
                 st.warning("Duration constraint not fully met")
 
-    # Prediction interface
+    # Prediction interfaces
     st.header("Cost Prediction")
     
-    with st.form("prediction_form"):
-        st.subheader("Calculate Accommodation Costs")
+    with st.form("accommodation_form"):
+        st.subheader("Accommodation Cost Prediction")
         
         col1, col2 = st.columns(2)
         with col1:
-            destination = st.selectbox("Destination", DESTINATIONS)
-            duration = st.number_input("Duration (days)", min_value=1, max_value=90, value=7)
-            accommodation = st.selectbox("Accommodation Type", ACCOMMODATION_TYPES)
-            nationality = st.selectbox("Nationality", NATIONALITIES)
+            destination = st.selectbox("Destination", DESTINATIONS, key='acc_dest')
+            duration = st.number_input("Duration (days)", min_value=1, max_value=90, value=7, key='acc_dur')
+            accommodation = st.selectbox("Accommodation Type", ACCOMMODATION_TYPES, key='acc_type')
+            nationality = st.selectbox("Nationality", NATIONALITIES, key='acc_nat')
         
         with col2:
-            start_date = st.date_input("Start Date", datetime.today())
+            start_date = st.date_input("Start Date", datetime.today(), key='acc_date')
             month = start_date.month
             day_of_week = start_date.weekday()
             is_weekend = 1 if day_of_week >= 5 else 0
@@ -349,7 +399,8 @@ if data is not None:
             
             prediction = model.predict(input_data)[0]
             
-            st.success(f"## Predicted Cost: ${prediction:,.2f}")
+            st.success(f"## Predicted Accommodation Cost: ${prediction:,.2f}")
+            st.session_state['accom_pred'] = prediction
             
             st.subheader("Cost Breakdown")
             base_cost = prediction / duration
@@ -362,7 +413,48 @@ if data is not None:
                 st.write("⚠️ Weekend surcharge applied")
                 
         except Exception as e:
-            st.error(f"Prediction failed: {str(e)}. Please train the model first.")
+            st.error(f"Prediction failed: {str(e)}. Please train the accommodation model first.")
+
+    with st.form("transport_form"):
+        st.subheader("Transportation Cost Prediction")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            trans_destination = st.selectbox("Destination", DESTINATIONS, key='trans_dest')
+            trans_type = st.selectbox("Transportation Type", TRANSPORT_TYPES, key='trans_type')
+        with col2:
+            trans_nationality = st.selectbox("Nationality", NATIONALITIES, key='trans_nat')
+            is_peak = st.checkbox("Peak Season Travel", value=False, key='trans_peak')
+        
+        submitted = st.form_submit_button("Calculate Transport Cost")
+
+    if submitted:
+        input_data = pd.DataFrame([{
+            'Destination': trans_destination,
+            'TransportType': trans_type,
+            'TravelerNationality': trans_nationality,
+            'PeakSeason': int(is_peak)
+        }])
+        
+        pred_cost = transport_model.predict(input_data)[0]
+        
+        st.success(f"### Estimated Transportation Cost: ${pred_cost:.2f}")
+        st.session_state['trans_pred'] = pred_cost
+
+        # Show cost factors
+        st.write("**Cost Factors:**")
+        if is_peak:
+            st.write("- Peak season surcharge applied")
+        if trans_type == 'Flight':
+            st.write("- Flight is the most expensive transportation option")
+
+    # Combined cost prediction
+    if 'accom_pred' in st.session_state and 'trans_pred' in st.session_state:
+        st.header("💵 Total Trip Cost")
+        total_cost = st.session_state['accom_pred'] + st.session_state['trans_pred']
+        st.success(f"## Total Estimated Cost: ${total_cost:,.2f}")
+        st.write(f"- Accommodation: ${st.session_state['accom_pred']:,.2f}")
+        st.write(f"- Transportation: ${st.session_state['trans_pred']:,.2f}")
 
 else:
     st.error("Failed to load dataset. Please check if 'Travel_details_dataset.csv' exists.")
