@@ -61,7 +61,7 @@ def remove_outliers(df, columns):
     return df_clean, outlier_info
 
 # Load data function
-@st.cache_data
+@st.cache_resource
 def load_data():
     try:
         # Load the dataset with proper encoding
