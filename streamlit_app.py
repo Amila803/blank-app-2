@@ -214,17 +214,17 @@ if data is not None:
         # Feature engineering
         transport_data = data[['Destination', 'TransportType', 'TravelerNationality', 'TransportCost', 'StartDate']].copy()
     
-    # Add Duration with a default value if it doesn't exist
-    if 'Duration' not in transport_data.columns:
-        transport_data['Duration'] = 1  # Default duration for transportation
-        
-    transport_data = FeatureEngineer().fit_transform(transport_data)
-    
-    # Remove unnecessary columns
-    transport_data = transport_data.drop(['Cost', 'AccommodationType'], axis=1, errors='ignore')
-    
-    X = transport_data.drop('TransportCost', axis=1)
-    y = transport_data['TransportCost']
+            # Add Duration with a default value if it doesn't exist
+            if 'Duration' not in transport_data.columns:
+                transport_data['Duration'] = 1  # Default duration for transportation
+                
+            transport_data = FeatureEngineer().fit_transform(transport_data)
+            
+            # Remove unnecessary columns
+            transport_data = transport_data.drop(['Cost', 'AccommodationType'], axis=1, errors='ignore')
+            
+            X = transport_data.drop('TransportCost', axis=1)
+            y = transport_data['TransportCost']
         
         # Preprocessing
         preprocessor = ColumnTransformer(
