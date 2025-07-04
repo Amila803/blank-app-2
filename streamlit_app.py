@@ -180,4 +180,150 @@ if data is not None:
     # --- ACCOMMODATION COST PREDICTION ---
     st.header("Cost Prediction")
 
-    # Prepare 
+    # Prepare features and target
+    features = ['Destination', 'Duration', 'AccommodationType', 'TravelerNationality', 
+                'Month', 'IsWeekend', 'IsPeakSeason']
+    target = 'Cost'
+
+    X = engineered_data[features]
+    y = engineered_data[target]
+
+    # Simplified preprocessing
+    categorical_features = ['Destination', 'AccommodationType', 'TravelerNationality']
+    numeric_features = ['Duration', 'Month', 'IsWeekend', 'IsPeakSeason']
+    
+    preprocessor = ColumnTransformer([
+        ('num', StandardScaler(), numeric_features),
+        ('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), categorical_features)
+    ])
+
+    # Faster model with feature selection
+    model = Pipeline([
+        ('preprocessor', preprocessor),
+        ('feature_selection', SelectFromModel(LGBMRegressor(n_estimators=100, random_state=42))),
+        ('regressor', XGBRegressor(
+            n_estimators=300,
+            learning_rate=0.1,
+            max_depth=6,
+            random_state=42,
+            n_jobs=-1,
+            tree_method='hist'  # Faster training method
+        ))
+    ])
+
+    # Train model
+    if st.button("Train Model"):
+        with st.spinner("Training model..."):
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42)
+            
+            # Faster training with early stopping
+            model.fit(X_train, y_train,
+                     regressor__early_stopping_rounds=10,
+                     regressor__eval_set=[(X_test, y_test)],
+                     regressor__verbose=False)
+            
+            # Evaluate
+            y_pred = model.predict(X_test)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("MAE", f"${mean_absolute_error(y_test, y_pred):.2f}")
+                st.metric("RMSE", f"${np.sqrt(mean_squared_error(y_test, y_pred)):.2f}")
+                st.metric("R² Score", f"{r2_score(y_test, y_pred):.4f}")
+            
+            with col2:
+                fig, ax = plt.subplots(figsize=(8,6))
+                sns.regplot(x=y_test, y=y_pred, scatter_kws={'alpha':0.3}, ax=ax)
+                ax.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
+                st.pyplot(fig, use_container_width=True)
+
+            # Save model
+            joblib.dump(model, 'travel_cost_model.pkl')
+            st.success("Model trained and saved!")
+
+    # Prediction Interface
+    st.header("Cost Prediction")
+
+    with st.form("prediction_form"):
+        st.subheader("Calculate Accommodation Costs")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            destination = st.selectbox("Destination", options['DESTINATIONS'])
+            duration = st.number_input("Duration (days)", min_value=1, max_value=90, value=7)
+            accommodation = st.selectbox("Accommodation Type", options['ACCOMMODATION_TYPES'])
+            nationality = st.selectbox("Nationality", options['NATIONALITIES'])
+        
+        with col2:
+            start_date = st.date_input("Start Date", datetime.today())
+            month = start_date.month
+            is_weekend = 1 if start_date.weekday() >= 5 else 0
+            is_peak_season = 1 if month in [6,7,8,12] else 0
+        
+        submitted = st.form_submit_button("Calculate Accommodation Cost")
+
+    if submitted:
+        try:
+            model = joblib.load('travel_cost_model.pkl')
+            
+            input_data = pd.DataFrame([{
+                'Destination': destination,
+                'Duration': duration,
+                'AccommodationType': accommodation,
+                'TravelerNationality': nationality,
+                'Month': month,
+                'IsWeekend': is_weekend,
+                'IsPeakSeason': is_peak_season
+            }])
+            
+            prediction = model.predict(input_data)[0]
+            st.success(f"## Predicted Cost: ${prediction:,.2f}")
+            st.session_state['accom_pred'] = prediction
+            
+            # Show cost breakdown
+            st.write(f"**Daily rate:** ${prediction/duration:,.2f}")
+            if is_peak_season:
+                st.write("⚠️ Peak season pricing")
+            if is_weekend:
+                st.write("⚠️ Weekend pricing")
+
+        except Exception as e:
+            st.error(f"Prediction failed: {str(e)}")
+
+    # Transport Prediction interface
+    with st.form("transport_form"):
+        st.subheader("Calculate Transportation Costs")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            trans_destination = st.selectbox("Destination", options['DESTINATIONS'], key='trans_dest')
+            trans_type = st.selectbox("Transportation Type", options['TRANSPORT_TYPES'], key='trans_type')
+        with col2:
+            trans_nationality = st.selectbox("Nationality", options['NATIONALITIES'], key='trans_nat')
+            is_peak = st.checkbox("Peak Season Travel", value=False)
+        
+        submitted = st.form_submit_button("Calculate Transport Cost")
+
+    if submitted:
+        input_data = pd.DataFrame([{
+            'Destination': trans_destination,
+            'TransportType': trans_type,
+            'TravelerNationality': trans_nationality,
+            'PeakSeason': int(is_peak)
+        }])
+        
+        pred_cost = transport_model.predict(input_data)[0]
+        st.success(f"### Estimated Transportation Cost: ${pred_cost:.2f}")
+        st.session_state['trans_pred'] = pred_cost
+
+    # Combined Cost Prediction
+    st.header("💵 Combined Cost Prediction")
+
+    if 'accom_pred' in st.session_state and 'trans_pred' in st.session_state:
+        total_cost = st.session_state['accom_pred'] + st.session_state['trans_pred']
+        st.success(f"## Total Estimated Trip Cost: ${total_cost:,.2f}")
+        st.write(f"- Accommodation: ${st.session_state['accom_pred']:,.2f}")
+        st.write(f"- Transportation: ${st.session_state['trans_pred']:,.2f}")
+else:
+    st.error("Failed to load dataset. Please check if 'Travel_details_dataset.csv' exists.")
