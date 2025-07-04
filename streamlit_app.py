@@ -273,50 +273,52 @@ if data is not None:
             is_peak_season = 1 if month in [6,7,8,12] else 0
         
         submitted = st.form_submit_button("Calculate Accommodation Cost")
-    
-        if submitted:
-            try:
-                model = joblib.load('travel_cost_model.pkl')
-                
-                # Get destination stats
-                dest_stats = data.groupby('Destination').agg({
-                    'Cost': ['mean', 'count'],
-                    'Duration': 'mean'
-                }).droplevel(0, axis=1)
-                
-                # Create input data
-                input_data = pd.DataFrame([{
-                    'Destination': destination,
-                    'Duration': duration,
-                    'AccommodationType': accommodation,
-                    'TravelerNationality': nationality,
-                    'Month': month,
-                    'IsWeekend': is_weekend,
-                    'IsPeakSeason': is_peak_season,
-                    'DestAvgCost': dest_stats.loc[destination, 'mean'] if destination in dest_stats.index else data['Cost'].mean(),
-                    'DestCount': dest_stats.loc[destination, 'count'] if destination in dest_stats.index else 1,
-                    'DestAvgDuration': dest_stats.loc[destination, 'mean'] if destination in dest_stats.index else data['Duration'].mean()
-                }])
-                
-                # Predict COST PER DAY
-                cost_per_day = model.predict(input_data)[0]
-                
-                # Calculate TOTAL COST
-                total_cost = cost_per_day * duration
-                
-                # Apply non-linear scaling for longer stays
-                if duration > 7:  # Example: discount for stays longer than a week
-                    total_cost *= 0.95  # 5% discount
-                if duration > 14:
-                    total_cost *= 0.93  # Additional 2% discount
-                    
-                st.success(f"## Predicted Cost: ${total_cost:,.2f}")
-                st.write(f"Breakdown: ${cost_per_day:,.2f}/day × {duration} days")
-                st.session_state['accom_pred'] = total_cost
-                
-        except Exception as e:
-            st.error(f"Prediction failed: {str(e)}")
 
+    # Prediction Interface
+if submitted:
+    try:  # <-- Add this line
+        model = joblib.load('travel_cost_model.pkl')
+        
+        # Get destination stats
+        dest_stats = data.groupby('Destination').agg({
+            'Cost': ['mean', 'count'],
+            'Duration': 'mean'
+        }).droplevel(0, axis=1)
+        
+        # Create input data
+        input_data = pd.DataFrame([{
+            'Destination': destination,
+            'Duration': duration,
+            'AccommodationType': accommodation,
+            'TravelerNationality': nationality,
+            'Month': month,
+            'IsWeekend': is_weekend,
+            'IsPeakSeason': is_peak_season,
+            'DestAvgCost': dest_stats.loc[destination, 'mean'] if destination in dest_stats.index else data['Cost'].mean(),
+            'DestCount': dest_stats.loc[destination, 'count'] if destination in dest_stats.index else 1,
+            'DestAvgDuration': dest_stats.loc[destination, 'mean'] if destination in dest_stats.index else data['Duration'].mean()
+        }])
+        
+        # Predict COST PER DAY
+        cost_per_day = model.predict(input_data)[0]
+        
+        # Calculate TOTAL COST
+        total_cost = cost_per_day * duration
+        
+        # Apply non-linear scaling for longer stays
+        if duration > 7:  # Example: discount for stays longer than a week
+            total_cost *= 0.95  # 5% discount
+        if duration > 14:
+            total_cost *= 0.93  # Additional 2% discount
+            
+        st.success(f"## Predicted Cost: ${total_cost:,.2f}")
+        st.write(f"Breakdown: ${cost_per_day:,.2f}/day × {duration} days")
+        st.session_state['accom_pred'] = total_cost
+
+    except Exception as e:  # <-- Add this block
+        st.error(f"Prediction failed: {str(e)}")
+    
+    
     # Transport Prediction interface
     with st.form("transport_form"):
         st.subheader("Calculate Transportation Costs")
