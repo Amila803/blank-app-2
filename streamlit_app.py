@@ -459,13 +459,13 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         if trans_destination == 'Bali' and trans_type == 'Train':
             st.warning("Limited train options in Bali - consider flights or car rental")
 
-    # --- INTEGRATION ---
-    st.header("💵 Combined Cost Prediction")
+# --- INTEGRATION ---
+st.header("💵 Combined Cost Prediction")
 
-    if 'accom_pred' in st.session_state and 'trans_pred' in st.session_state:
-        total_cost = st.session_state['accom_pred'] + st.session_state['trans_pred']
-        st.success(f"## Total Estimated Trip Cost: ${total_cost:.2f}")
-        st.write(f"- Accommodation: ${st.session_state['accom_pred']:.2f}")
-        st.write(f"- Transportation: ${st.session_state['trans_pred']:.2f}")
+if 'accom_pred' in st.session_state and 'trans_pred' in st.session_state:
+    total_cost = st.session_state['accom_pred'] + st.session_state['trans_pred']
+    st.success(f"## Total Estimated Trip Cost: ${total_cost:.2f}")
+    st.write(f"- Accommodation: ${st.session_state['accom_pred']:.2f}")
+    st.write(f"- Transportation: ${st.session_state['trans_pred']:.2f}")
 else:
-    st.error("Failed to load dataset. Please check if 'Travel_details_dataset.csv' exists in the same directory.")
+    st.error("Failed to load predictions. Make sure you’ve run both accommodation and transportation models.")
