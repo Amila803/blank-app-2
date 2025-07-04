@@ -109,19 +109,20 @@ if data is not None:
 # Feature Engineering
 
     class FeatureEngineer(BaseEstimator, TransformerMixin):
-        def __init__(self):
-            # instantiate holiday calendars 
-            self.holidays_de = holidays.DE()
-    
-        def fit(self, X, y=None):
-            return self
-    
-        def _check_holiday(self, row):
-            date = row['StartDate']
-            return int(date in self.holidays_de)
-    
-        def transform(self, X):
-            X = X.copy()
+    def __init__(self):
+        self.holidays_de = holidays.DE()
+
+    def fit(self, X, y=None):
+        return self
+
+    def _check_holiday(self, row):
+        date = row['StartDate']
+        return int(date in self.holidays_de)
+
+    def transform(self, X):
+        # 1st indent level: class = 4 spaces
+        # 2nd indent level: method = +4 spaces = 8 spaces total
+        X = X.copy()
 
         # —— Date features ——  
         if 'StartDate' in X.columns:
@@ -160,6 +161,9 @@ if data is not None:
                 X['WeekendDuration'] = X['IsWeekend'] * X['Duration']
 
         return X
+
+
+
 
 
 
