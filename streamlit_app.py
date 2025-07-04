@@ -150,11 +150,12 @@ if data is not None:
         st.pyplot(fig, use_container_width=True)
 
     # --- TRANSPORTATION COST PREDICTION ---
-    st.header("🚆 Enhanced Transportation Cost Prediction")
+    st.header("🚆 Transportation Cost Prediction")
 
-    # Train enhanced transport model
+    # Train transportation model
     @st.cache_resource
     def train_transport_model():
+        # Feature engineering
         transport_data = data[['Destination', 'TransportType', 'TravelerNationality', 'TransportCost']].copy()
         transport_data['PeakSeason'] = pd.to_datetime(data['StartDate']).dt.month.isin([6,7,8,12]).astype(int)
         transport_data['HolidaySeason'] = pd.to_datetime(data['StartDate']).dt.month.isin([11,12]).astype(int)
@@ -166,7 +167,7 @@ if data is not None:
         preprocessor = ColumnTransformer(
             transformers=[
                 ('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), 
-                ['Destination', 'TransportType', 'TravelerNationality']),
+                 ['Destination', 'TransportType', 'TravelerNationality']),
                 ('scaler', RobustScaler(), ['PeakSeason', 'HolidaySeason'])
             ])
         
@@ -324,7 +325,7 @@ if data is not None:
             st.success("Enhanced model trained and saved successfully!")
 
     # Enhanced Prediction Interface
-    st.header("💰 Enhanced Cost Prediction")
+    st.header("💰 Cost Prediction")
 
     with st.form("enhanced_prediction_form"):
         st.subheader("Calculate Accommodation Costs")
@@ -391,8 +392,49 @@ if data is not None:
         except Exception as e:
             st.error(f"Prediction failed: {str(e)}")
 
+    # Transport Prediction interface
+    with st.form("transport_form"):
+        st.subheader("Calculate Transportation Costs")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            trans_destination = st.selectbox("Destination", options['DESTINATIONS'], key='trans_dest')
+            trans_type = st.selectbox("Transportation Type", options['TRANSPORT_TYPES'], key='trans_type')
+        with col2:
+            trans_nationality = st.selectbox("Nationality", options['NATIONALITIES'], key='trans_nat')
+            is_peak = st.checkbox("Peak Season Travel", value=False, key='peak_check')
+            is_holiday = st.checkbox("Holiday Season Travel", value=False, key='holiday_check')
+        
+        submitted = st.form_submit_button("Calculate Transport Cost")
+
+    if submitted:
+        input_data = pd.DataFrame([{
+            'Destination': trans_destination,
+            'TransportType': trans_type,
+            'TravelerNationality': trans_nationality,
+            'PeakSeason': int(is_peak),
+            'HolidaySeason': int(is_holiday)
+        }])
+        
+        pred_cost = transport_model.predict(input_data)[0]
+        
+        st.success(f"### Estimated Transportation Cost: ${pred_cost:,.2f}")
+        st.session_state['trans_pred'] = pred_cost
+
+        # Show cost factors
+        st.write("**Cost Factors:**")
+        if is_peak:
+            st.write("- Peak season surcharge applied")
+        if is_holiday:
+            st.write("- Holiday season premium applied")
+        if trans_nationality == 'Japanese' and trans_type == 'Train':
+            st.write("- Japanese travelers typically prefer trains (higher quality expectation)")
+        if trans_destination == 'Bali' and trans_type == 'Train':
+            st.warning("Limited train options in Bali - consider flights or car rental")
+
+
     # --- INTEGRATION ---
-    st.header("💵 Enhanced Combined Cost Prediction")
+    st.header("💵 Combined Cost Prediction")
 
     if 'enh_accom_pred' in st.session_state and 'trans_pred' in st.session_state:
         total_cost = st.session_state['enh_accom_pred'] + st.session_state['trans_pred']
