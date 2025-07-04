@@ -276,25 +276,25 @@ if data is not None:
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             
             # Hyperparameter tuning
-            param_distributions = {
-                'regressor__n_estimators': [100, 200, 300, 400, 500],
-                'regressor__max_depth': [None, 5, 10, 20, 30],
-                'regressor__min_samples_split': [2, 5, 10, 15],
-                'regressor__min_samples_leaf': [1, 2, 4, 6],
-                'regressor__max_features': ['sqrt', 'log2', None],
-                'regressor__bootstrap': [True, False]
+
+            param_dist = {
+                'regressor__regressor__xgb__n_estimators': [100, 200, 300],
+                'regressor__regressor__xgb__max_depth': [3, 5, 7],
+                'regressor__regressor__lgbm__num_leaves': [31, 63, 127],
+                'regressor__regressor__rf__max_features': ['sqrt', 'log2'],
+                'regressor__final_estimator__alpha': [0.1, 1.0, 10.0]
             }
             
             search = RandomizedSearchCV(
                 estimator=model,
-                param_distributions=param_distributions,
-                n_iter=50,
+                param_distributions=param_dist,
+                n_iter=100,
                 cv=5,
-                scoring='neg_mean_absolute_error',
+                scoring='r2',
                 n_jobs=-1,
-                random_state=42,
-                verbose=2
+                random_state=42
             )
+
             search.fit(X_train, y_train)
             
             best_model = search.best_estimator_
