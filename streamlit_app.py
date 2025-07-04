@@ -206,29 +206,31 @@ if data is not None:
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             
             # Hyperparameter tuning
-            param_grid = {
-            'regressor__n_estimators':    [200, 300, 400],
-            'regressor__max_depth':       [10, 20, 30, None],
-            'regressor__min_samples_split':[2, 5, 10],
-            'regressor__max_features':    ['sqrt', 'log2'],
-            # even min_samples_leaf, bootstrap, etc.
-            }
 
+            param_distributions = {
+                'regressor__n_estimators':       [100, 200, 300, 400, 500],
+                'regressor__max_depth':          [None, 5, 10, 20, 30],
+                'regressor__min_samples_split':  [2, 5, 10, 15],
+                'regressor__min_samples_leaf':   [1, 2, 4, 6],
+                'regressor__max_features':       ['sqrt', 'log2', None],
+                'regressor__bootstrap':          [True, False]
+            }
+            
             search = RandomizedSearchCV(
-                model,
-                param_distributions=param_grid,
-                n_iter=30,           # sample 30 random combos
+                estimator=model,
+                param_distributions=param_distributions,
+                n_iter=50,                     # sample 50 different combos
                 cv=5,
-                scoring='neg_mean_squared_error',
+                scoring='neg_mean_absolute_error',  # often better aligned with cost errors
                 n_jobs=-1,
-                random_state=42
+                random_state=42,
+                verbose=2
             )
             search.fit(X_train, y_train)
-            best_model = search.best_estimator_
             
-            grid_search = GridSearchCV(model, param_grid, cv=5, scoring='neg_mean_squared_error')
-            grid_search.fit(X_train, y_train)
-            best_model = grid_search.best_estimator_
+            best_model = search.best_estimator_
+            st.write("🔑 Best params:", search.best_params_)
+           
             
             # Save model
             joblib.dump(best_model, 'travel_cost_model.pkl')
