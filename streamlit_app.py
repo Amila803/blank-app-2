@@ -209,12 +209,22 @@ if data is not None:
     # Train transportation model
     @st.cache_resource
     def train_transport_model():
-        # Feature engineering
-        transport_data = data[['Destination', 'TransportType', 'TravelerNationality', 'TransportCost']].copy()
-        transport_data['PeakSeason'] = pd.to_datetime(data['StartDate']).dt.month.isin([6,7,8,12]).astype(int)
         
-        X = transport_data[['Destination', 'TransportType', 'TravelerNationality', 'PeakSeason']]
-        y = transport_data['TransportCost']
+        
+        # Feature engineering
+    transport_data = data[['Destination', 'TransportType', 'TravelerNationality', 'TransportCost', 'StartDate']].copy()
+    
+    # Add Duration with a default value if it doesn't exist
+    if 'Duration' not in transport_data.columns:
+        transport_data['Duration'] = 1  # Default duration for transportation
+        
+    transport_data = FeatureEngineer().fit_transform(transport_data)
+    
+    # Remove unnecessary columns
+    transport_data = transport_data.drop(['Cost', 'AccommodationType'], axis=1, errors='ignore')
+    
+    X = transport_data.drop('TransportCost', axis=1)
+    y = transport_data['TransportCost']
         
         # Preprocessing
         preprocessor = ColumnTransformer(
