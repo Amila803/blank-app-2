@@ -165,6 +165,7 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
 
         return X
 
+    transport_model = train_transport_model()
 
 
     
