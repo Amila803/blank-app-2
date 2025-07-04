@@ -161,14 +161,6 @@ if data is not None:
                     X['WeekendDuration'] = X['IsWeekend'] * X['Duration']
 
             return X
-
-
-
-
-
-
-    transport_model = train_transport_model()
-
     
     def _check_holiday(self, row):
         if 'StartDate' not in row or pd.isna(row['StartDate']):
@@ -273,7 +265,9 @@ if data is not None:
         model.fit(X, y)
         return model
 
+
     transport_model = train_transport_model()
+
 
     # Show transportation relationships
     st.subheader("Cost Patterns")
