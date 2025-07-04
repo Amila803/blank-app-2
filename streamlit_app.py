@@ -280,8 +280,8 @@ if data is not None:
     if submitted:
         try:
             # Load models
-            accom_model = joblib.load('accom_model.pkl')
-            trans_model = joblib.load('trans_model.pkl')
+            accom_model = joblib.load('travel_cost_model.pkl')
+            trans_model = joblib.load('travel_cost_model.pkl')
             
             # Prepare input data with all engineered features
             month = start_date.month
