@@ -26,31 +26,46 @@ This app predicts travel costs with improved date and duration relationships.
 # Replace your load_data() function with this:
 @st.cache_data
 def load_data():
-    # Load the actual dataset
     try:
+        # Load the dataset with proper encoding
         data = pd.read_csv("Travel_details_dataset.csv", encoding='utf-8-sig')
         
-        # Clean the data
-        data = data.dropna(how='all')  # Remove completely empty rows
+        # Remove completely empty rows
+        data = data.dropna(how='all')
         
-        # Clean cost columns (remove $ and commas, convert to float)
+        # Function to clean currency values
+        def clean_currency(value):
+            if isinstance(value, str):
+                # Remove USD, commas, and whitespace
+                value = value.replace('USD', '').replace(',', '').strip()
+                try:
+                    return float(value)
+                except:
+                    return None
+            return value
+        
+        # Clean cost columns
         for cost_col in ['Accommodation cost', 'Transportation cost']:
-            if data[cost_col].dtype == object:
-                data[cost_col] = data[cost_col].str.replace('[$,]', '', regex=True).astype(float)
+            data[cost_col] = data[cost_col].apply(clean_currency)
         
         # Clean destination names (remove countries)
         data['Destination'] = data['Destination'].str.split(',').str[0].str.strip()
         
-        # Convert dates
-        data['Start date'] = pd.to_datetime(data['Start date'], errors='coerce')
-        data['End date'] = pd.to_datetime(data['End date'], errors='coerce')
+        # Convert dates - handle multiple date formats
+        data['Start date'] = pd.to_datetime(data['Start date'], errors='coerce', format='mixed')
+        data['End date'] = pd.to_datetime(data['End date'], errors='coerce', format='mixed')
         
-        # Calculate duration if not properly calculated
+        # Calculate duration
         data['Duration (days)'] = (data['End date'] - data['Start date']).dt.days
         
         # Standardize transport types
-        data['Transportation type'] = data['Transportation type'].str.replace('Plane', 'Flight')
-        data['Transportation type'] = data['Transportation type'].str.replace('Car', 'Car rental')
+        transport_mapping = {
+            'Plane': 'Flight',
+            'Airplane': 'Flight',
+            'Car': 'Car rental',
+            'Subway': 'Train'
+        }
+        data['Transportation type'] = data['Transportation type'].replace(transport_mapping)
         
         # Rename columns to match your existing code
         data = data.rename(columns={
@@ -62,31 +77,61 @@ def load_data():
             'Transportation cost': 'TransportCost'
         })
         
-        # Filter only needed columns
+        # Filter only needed columns and drop rows with missing critical data
         data = data[[
             'Destination', 'Duration', 'Start date', 'AccommodationType',
             'TravelerNationality', 'Cost', 'TransportType', 'TransportCost'
-        ]]
+        ]].dropna(subset=['Cost', 'TransportCost'])
         
-        return data.dropna()
+        return data
     
     except Exception as e:
         st.error(f"Error loading dataset: {str(e)}")
-        return None
+        # Fallback to sample data
+        return load_sample_data()
 
-# Then update DESTINATIONS and other lists based on dataset
+def load_sample_data():
+    # Your original synthetic data generation code here
+    np.random.seed(42)
+    n_samples = 1000
+    destinations = ['London', 'Paris', 'Tokyo', 'New York', 'Bali']
+    base_costs = {'London': 150, 'Paris': 130, 'Tokyo': 200, 'New York': 180, 'Bali': 120}
+    
+    data = pd.DataFrame({
+        'Destination': np.random.choice(destinations, n_samples),
+        'Duration': np.random.randint(1, 30, n_samples),
+        'Start date': pd.to_datetime(np.random.choice(pd.date_range('2023-01-01', '2023-12-31'), n_samples)),
+        'AccommodationType': np.random.choice(['Hotel', 'Airbnb', 'Resort', 'Hostel'], n_samples),
+        'TravelerNationality': np.random.choice(['American', 'British', 'Canadian'], n_samples),
+        'Cost': 0,  # Will be calculated
+        'TransportType': np.random.choice(['Flight', 'Train', 'Bus', 'Car rental'], n_samples),
+        'TransportCost': 0  # Will be calculated
+    })
+    
+    accommodation_factors = {'Hostel': 0.2, 'Hotel': 1.0, 'Airbnb': 0.8, 'Resort': 1.5}
+    data['Cost'] = (
+        data['Destination'].map(base_costs) * 
+        data['Duration'] * 
+        (1 + 0.2 * data['Start date'].dt.month.isin([6,7,8,12])) * 
+        (1 + 0.1 * data['Start date'].dt.dayofweek.isin([4,5])) * 
+        data['AccommodationType'].map(accommodation_factors) * 
+        np.random.normal(1, 0.1, n_samples)
+    
+    # Simple transport cost calculation for sample data
+    transport_base = {'Flight': 300, 'Train': 100, 'Bus': 50, 'Car rental': 150}
+    data['TransportCost'] = data['TransportType'].map(transport_base) * np.random.normal(1, 0.2, n_samples)
+    
+    return data.round(2)
+
+# Load data
 data = load_data()
+
+# Update your dropdown options based on actual data
 if data is not None:
     DESTINATIONS = sorted(data['Destination'].unique().tolist())
     TRANSPORT_TYPES = sorted(data['TransportType'].dropna().unique().tolist())
     NATIONALITIES = sorted(data['TravelerNationality'].dropna().unique().tolist())
     ACCOMMODATION_TYPES = sorted(data['AccommodationType'].dropna().unique().tolist())
-else:
-    # Fallback to your original values if dataset fails to load
-    DESTINATIONS = ['London', 'Paris', 'Tokyo', 'New York', 'Bali']
-    TRANSPORT_TYPES = ['Flight', 'Train', 'Bus', 'Car rental']
-    NATIONALITIES = ['American', 'British', 'Canadian', 'Australian', 'Japanese']
-    ACCOMMODATION_TYPES = ['Hotel', 'Airbnb', 'Resort', 'Hostel']
 data = load_data()
 
 
