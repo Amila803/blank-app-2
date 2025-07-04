@@ -15,11 +15,7 @@ from datetime import datetime
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.compose import TransformedTargetRegressor
 from lightgbm import LGBMRegressor
-from sklearn.ensemble import GradientBoostingRegressor, StackingRegressor
-from xgboost import XGBRegressor
-from sklearn.linear_model import Ridge
-from sklearn.feature_selection import RFECV
-from sklearn.preprocessing import PolynomialFeatures
+
 
 
 # Set page config
@@ -211,114 +207,70 @@ if data is not None:
 
     # Preprocessing
     categorical_features = ['Destination', 'AccommodationType', 'TravelerNationality']
-    numeric_features = [col for col in features if col not in categorical_features + [target]]
-    
+    numeric_features = ['Duration', 'Month', 'IsWeekend', 'IsPeakSeason']
     preprocessor = ColumnTransformer([
-        ('num', Pipeline([
-            ('scaler', StandardScaler()),
-            ('poly', PolynomialFeatures(degree=2, include_bias=False))
-        ]), numeric_features),
-        ('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), categorical_features)
+        ('num', StandardScaler(), numeric_features),
+        ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features),
     ])
 
-    # Stacking Ensemble Model
-    base_models = [
-        ('xgb', XGBRegressor(random_state=42, n_jobs=-1)),
-        ('lgbm', LGBMRegressor(random_state=42, n_jobs=-1)),
-        ('gbr', GradientBoostingRegressor(random_state=42))
-    ]
-    
-    model = Pipeline([
+    # Model pipeline
+    model = Pipeline(steps=[
         ('preprocessor', preprocessor),
-        ('feature_selection', RFECV(estimator=RandomForestRegressor(n_estimators=50), 
-                                   cv=5, scoring='neg_mean_absolute_error')),
-        ('regressor', StackingRegressor(
-            estimators=base_models,
-            final_estimator=Ridge(),
-            cv=5,
-            n_jobs=-1
-        ))
+        ('regressor', RandomForestRegressor(random_state=42))
     ])
-
-    # Enhanced Hyperparameter Tuning
-    param_distributions = {
-        'feature_selection__estimator__max_depth': [3, 5, 7],
-        'regressor__xgb__n_estimators': [100, 200, 300],
-        'regressor__xgb__learning_rate': [0.01, 0.05, 0.1],
-        'regressor__xgb__max_depth': [3, 5, 7],
-        'regressor__lgbm__n_estimators': [100, 200, 300],
-        'regressor__lgbm__learning_rate': [0.01, 0.05, 0.1],
-        'regressor__lgbm__num_leaves': [31, 63, 127],
-        'regressor__gbr__n_estimators': [100, 200],
-        'regressor__gbr__learning_rate': [0.05, 0.1],
-        'regressor__gbr__max_depth': [3, 5]
-    }
 
     # Train model
     if st.button("Train Model"):
         with st.spinner("Training model..."):
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=0.2, random_state=42)
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             
-            # Apply log transformation to target for better performance
-            y_train_transformed = np.log1p(y_train)
+            # Hyperparameter tuning
+
+            param_distributions = {
+                'regressor__n_estimators':       [100, 200, 300, 400, 500],
+                'regressor__max_depth':          [None, 5, 10, 20, 30],
+                'regressor__min_samples_split':  [2, 5, 10, 15],
+                'regressor__min_samples_leaf':   [1, 2, 4, 6],
+                'regressor__max_features':       ['sqrt', 'log2', None],
+                'regressor__bootstrap':          [True, False]
+            }
             
             search = RandomizedSearchCV(
                 estimator=model,
                 param_distributions=param_distributions,
-                n_iter=50,
+                n_iter=50,                     # sample 50 different combos
                 cv=5,
-                scoring='neg_mean_absolute_error',
+                scoring='neg_mean_absolute_error',  # often better aligned with cost errors
                 n_jobs=-1,
                 random_state=42,
                 verbose=2
             )
-            
-            search.fit(X_train, y_train_transformed)
+            search.fit(X_train, y_train)
             
             best_model = search.best_estimator_
             st.write("🔑 Best params:", search.best_params_)
+           
             
-            # Evaluate on test set (reverse log transform)
-            y_pred = np.expm1(best_model.predict(X_test))
+            # Save model
+            joblib.dump(best_model, 'travel_cost_model.pkl')
+            st.success("Model trained and saved!")
+
+            # Evaluation
+            st.subheader("Model Evaluation")
+            y_pred = best_model.predict(X_test)
             
             col1, col2 = st.columns(2)
             with col1:
                 st.metric("MAE", f"${mean_absolute_error(y_test, y_pred):.2f}")
-                st.metric("RMSE", f"${np.sqrt(mean_squared_error(y_test, y_pred)):.2f}")
-                st.metric("R² Score", f"{r2_score(y_test, y_pred):.4f}")
+                st.metric("R² Score", f"{r2_score(y_test, y_pred):.2f}")
             
             with col2:
-                fig, ax = plt.subplots(figsize=(8,6))
-                sns.regplot(x=y_test, y=y_pred, scatter_kws={'alpha':0.3}, line_kws={'color':'red'}, ax=ax)
+                fig, ax = plt.subplots()
+                ax.scatter(y_test, y_pred, alpha=0.5)
                 ax.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
                 ax.set_xlabel('Actual Cost')
                 ax.set_ylabel('Predicted Cost')
-                ax.set_title('Actual vs Predicted Costs')
                 st.pyplot(fig)
-                
-                # Feature importance plot
-                try:
-                    if hasattr(best_model.named_steps['regressor'], 'feature_importances_'):
-                        importances = best_model.named_steps['regressor'].feature_importances_
-                    else:
-                        importances = best_model.named_steps['regressor'].final_estimator_.coef_
-                    
-                    feature_names = (numeric_features + 
-                                    list(best_model.named_steps['preprocessor']
-                                        .named_transformers_['cat']
-                                        .get_feature_names_out(categorical_features)))
-                    feat_imp = pd.Series(importances, index=feature_names)
-                    plt.figure(figsize=(10,6))
-                    feat_imp.nlargest(20).plot(kind='barh')
-                    plt.title('Top 20 Important Features')
-                    st.pyplot(plt.gcf())
-                except Exception as e:
-                    st.warning(f"Could not plot feature importance: {str(e)}")
-
-            # Save model
-            joblib.dump(best_model, 'travel_cost_model.pkl')
-            st.success("Model trained and saved!")
 
     # Prediction Interface
     st.header("Cost Prediction")
