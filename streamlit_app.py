@@ -146,7 +146,7 @@ def load_transport_data():
     
     # Create cost relationships based on nationality and destination
     data = pd.DataFrame({
-        'Destination': np.random.choice(list(transport_costs.keys()), n_samples),
+        'Destination': np.random.choice(DESTINATIONS, n_samples),
         'TransportType': np.random.choice(TRANSPORT_TYPES, n_samples),
         'Nationality': np.random.choice(NATIONALITIES, n_samples),
         'PeakSeason': np.random.choice([0,1], n_samples, p=[0.7,0.3])
@@ -378,7 +378,7 @@ with st.form("transport_form"):
     
     col1, col2 = st.columns(2)
     with col1:
-        trans_destination = st.selectbox("Destination", list(transport_costs.keys()), key='trans_dest')
+        trans_destination = st.selectbox("Destination",DESTINATIONS, key='trans_dest')
         trans_type = st.selectbox("Transportation Type", TRANSPORT_TYPES, key='trans_type')
     with col2:
         trans_nationality = st.selectbox("Nationality", NATIONALITIES, key='trans_nat')
