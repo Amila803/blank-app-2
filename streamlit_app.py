@@ -187,7 +187,7 @@ if data is not None:
         best_model = grid_search.best_estimator_
         
         # Save model and feature importance
-        joblib.dump(best_model, f'{model_name}_model.pkl')
+        joblib.dump(best_model, f'travel_cost_model.pkl')
         
         # Get feature importance
         feature_importances = best_model.named_steps['regressor'].feature_importances_
