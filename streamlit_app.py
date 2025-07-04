@@ -12,7 +12,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import joblib
 from datetime import datetime
-from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import RandomizedSearchCV, RepeatedKFold
 from sklearn.compose import TransformedTargetRegressor
 from lightgbm import LGBMRegressor
 
