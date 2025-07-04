@@ -115,7 +115,7 @@ def load_sample_data():
         (1 + 0.2 * data['Start date'].dt.month.isin([6,7,8,12])) * 
         (1 + 0.1 * data['Start date'].dt.dayofweek.isin([4,5])) * 
         data['AccommodationType'].map(accommodation_factors) * 
-        np.random.normal(1, 0.1, n_samples)
+        np.random.normal(1, 0.1, n_samples))
     
     # Simple transport cost calculation for sample data
     transport_base = {'Flight': 300, 'Train': 100, 'Bus': 50, 'Car rental': 150}
