@@ -17,10 +17,10 @@ from sklearn.linear_model import Ridge
 from sklearn.feature_selection import SelectFromModel
 
 # Set page config
-st.set_page_config(page_title="Travel Cost Predictor", page_icon="✈️", layout="wide")
+st.set_page_config(page_title="Fast Travel Cost Predictor", page_icon="✈️", layout="wide")
 
 # Title and description
-st.title("✈️ Travel Cost Predictor")
+st.title("✈️ Fast Travel Cost Predictor")
 st.markdown("""
 This optimized app quickly predicts travel costs based on actual travel data.
 """)
