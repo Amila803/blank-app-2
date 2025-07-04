@@ -109,58 +109,58 @@ if data is not None:
 # Feature Engineering
 
     class FeatureEngineer(BaseEstimator, TransformerMixin):
-    def __init__(self):
-        self.holidays_de = holidays.DE()
+        def __init__(self):
+            self.holidays_de = holidays.DE()
+    
+        def fit(self, X, y=None):
+            return self
+    
+        def _check_holiday(self, row):
+            date = row['StartDate']
+            return int(date in self.holidays_de)
+    
+        def transform(self, X):
+            # 1st indent level: class = 4 spaces
+            # 2nd indent level: method = +4 spaces = 8 spaces total
+            X = X.copy()
+    
+            # —— Date features ——  
+            if 'StartDate' in X.columns:
+                X['Year']        = X['StartDate'].dt.year
+                X['Month']       = X['StartDate'].dt.month
+                X['Day']         = X['StartDate'].dt.day
+                X['DayOfWeek']   = X['StartDate'].dt.dayofweek
+                X['IsWeekend']   = X['DayOfWeek'].isin([5,6]).astype(int)
+                X['Quarter']     = X['StartDate'].dt.quarter
+                X['DayOfYear']   = X['StartDate'].dt.dayofyear
+                X['WeekOfYear']  = X['StartDate'].dt.isocalendar().week
+                X = X.drop('StartDate', axis=1)
+    
+            # —— Holiday features ——  
+            if 'StartDate' in X.columns and 'TravelerNationality' in X.columns:
+                X['IsHoliday'] = X.apply(self._check_holiday, axis=1)
+    
+            # —— Seasonality flags ——  
+            if 'Month' in X.columns:
+                X['IsPeakSeason']     = X['Month'].isin([6,7,8,12]).astype(int)
+                X['IsShoulderSeason'] = X['Month'].isin([4,5,9,10]).astype(int)
+                X['IsLowSeason']      = X['Month'].isin([1,2,3,11]).astype(int)
+    
+            # —— Duration features ——  
+            if 'Duration' in X.columns:
+                X['LogDuration']  = np.log1p(X['Duration'])
+                X['SqrtDuration'] = np.sqrt(X['Duration'])
+                X['DurationBins'] = pd.cut(
+                    X['Duration'],
+                    bins=[0,3,7,14,30,90],
+                    labels=['0-3','4-7','8-14','15-30','30+']
+                )
+                if 'IsPeakSeason' in X.columns:
+                    X['PeakDuration'] = X['IsPeakSeason'] * X['Duration']
+                if 'IsWeekend' in X.columns:
+                    X['WeekendDuration'] = X['IsWeekend'] * X['Duration']
 
-    def fit(self, X, y=None):
-        return self
-
-    def _check_holiday(self, row):
-        date = row['StartDate']
-        return int(date in self.holidays_de)
-
-    def transform(self, X):
-        # 1st indent level: class = 4 spaces
-        # 2nd indent level: method = +4 spaces = 8 spaces total
-        X = X.copy()
-
-        # —— Date features ——  
-        if 'StartDate' in X.columns:
-            X['Year']        = X['StartDate'].dt.year
-            X['Month']       = X['StartDate'].dt.month
-            X['Day']         = X['StartDate'].dt.day
-            X['DayOfWeek']   = X['StartDate'].dt.dayofweek
-            X['IsWeekend']   = X['DayOfWeek'].isin([5,6]).astype(int)
-            X['Quarter']     = X['StartDate'].dt.quarter
-            X['DayOfYear']   = X['StartDate'].dt.dayofyear
-            X['WeekOfYear']  = X['StartDate'].dt.isocalendar().week
-            X = X.drop('StartDate', axis=1)
-
-        # —— Holiday features ——  
-        if 'StartDate' in X.columns and 'TravelerNationality' in X.columns:
-            X['IsHoliday'] = X.apply(self._check_holiday, axis=1)
-
-        # —— Seasonality flags ——  
-        if 'Month' in X.columns:
-            X['IsPeakSeason']     = X['Month'].isin([6,7,8,12]).astype(int)
-            X['IsShoulderSeason'] = X['Month'].isin([4,5,9,10]).astype(int)
-            X['IsLowSeason']      = X['Month'].isin([1,2,3,11]).astype(int)
-
-        # —— Duration features ——  
-        if 'Duration' in X.columns:
-            X['LogDuration']  = np.log1p(X['Duration'])
-            X['SqrtDuration'] = np.sqrt(X['Duration'])
-            X['DurationBins'] = pd.cut(
-                X['Duration'],
-                bins=[0,3,7,14,30,90],
-                labels=['0-3','4-7','8-14','15-30','30+']
-            )
-            if 'IsPeakSeason' in X.columns:
-                X['PeakDuration'] = X['IsPeakSeason'] * X['Duration']
-            if 'IsWeekend' in X.columns:
-                X['WeekendDuration'] = X['IsWeekend'] * X['Duration']
-
-        return X
+            return X
 
 
 
