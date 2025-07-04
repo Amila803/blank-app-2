@@ -156,7 +156,7 @@ if data is not None:
             if 'IsWeekend' in X.columns:
                 X['WeekendDuration'] = X['IsWeekend'] * X['Duration']
         
-        return X
+            return X
     
     def _check_holiday(self, row):
         if 'StartDate' not in row or pd.isna(row['StartDate']):
