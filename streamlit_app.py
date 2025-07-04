@@ -231,7 +231,7 @@ if data is not None:
     preprocessor = ColumnTransformer([
         ('num', StandardScaler(), numeric_features),
         ('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), categorical_features)
-
+    ]
 
     # Model pipeline
     model = Pipeline(steps=[
