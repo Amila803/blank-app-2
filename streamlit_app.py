@@ -104,6 +104,77 @@ if data is not None:
     ACCOMMODATION_TYPES = sorted(data['AccommodationType'].dropna().unique().tolist())
     
     # Feature Engineering
+
+    class FeatureEngineer(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        self.holidays_us = holidays.US()
+        self.holidays_uk = holidays.UK()
+        self.holidays_jp = holidays.JP()
+        self.holidays_de = holidays.DE()
+        
+    def fit(self, X, y=None):
+        return self
+    
+    def transform(self, X):
+        X = X.copy()
+        
+        # Date features (only if StartDate exists)
+        if 'StartDate' in X.columns:
+            X['Year'] = X['StartDate'].dt.year
+            X['Month'] = X['StartDate'].dt.month
+            X['Day'] = X['StartDate'].dt.day
+            X['DayOfWeek'] = X['StartDate'].dt.dayofweek
+            X['IsWeekend'] = X['DayOfWeek'].isin([5,6]).astype(int)
+            X['Quarter'] = X['StartDate'].dt.quarter
+            X['DayOfYear'] = X['StartDate'].dt.dayofyear
+            X['WeekOfYear'] = X['StartDate'].dt.isocalendar().week
+            X = X.drop('StartDate', axis=1)
+        
+        # Holiday features
+        if 'TravelerNationality' in X.columns:
+            X['IsHoliday'] = X.apply(self._check_holiday, axis=1)
+        
+        # Seasonality
+        if 'Month' in X.columns:
+            X['IsPeakSeason'] = X['Month'].isin([6,7,8,12]).astype(int)
+            X['IsShoulderSeason'] = X['Month'].isin([4,5,9,10]).astype(int)
+            X['IsLowSeason'] = X['Month'].isin([1,2,3,11]).astype(int)
+        
+        # Duration features (only if Duration exists)
+        if 'Duration' in X.columns:
+            X['LogDuration'] = np.log1p(X['Duration'])
+            X['SqrtDuration'] = np.sqrt(X['Duration'])
+            X['DurationBins'] = pd.cut(X['Duration'], 
+                                     bins=[0,3,7,14,30,90],
+                                     labels=['0-3','4-7','8-14','15-30','30+'])
+            if 'IsPeakSeason' in X.columns:
+                X['PeakDuration'] = X['IsPeakSeason'] * X['Duration']
+            if 'IsWeekend' in X.columns:
+                X['WeekendDuration'] = X['IsWeekend'] * X['Duration']
+        
+        return X
+    
+    def _check_holiday(self, row):
+        if 'StartDate' not in row or pd.isna(row['StartDate']):
+            return 0
+        if 'TravelerNationality' not in row:
+            return 0
+            
+        date = row['StartDate']
+        country = row['TravelerNationality']
+        
+        try:
+            if country == 'United States':
+                return date in self.holidays_us
+            elif country == 'United Kingdom':
+                return date in self.holidays_uk
+            elif country == 'Japan':
+                return date in self.holidays_jp
+            elif country == 'Germany':
+                return date in self.holidays_de
+            return 0
+        except:
+            return 0
     def engineer_features(df):
         df = df.copy()
         # Extract date features
