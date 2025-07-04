@@ -99,15 +99,7 @@ if data is not None:
     TRANSPORT_TYPES = sorted(data['TransportType'].dropna().unique().tolist())
     NATIONALITIES = sorted(data['TravelerNationality'].dropna().unique().tolist())
     ACCOMMODATION_TYPES = sorted(data['AccommodationType'].dropna().unique().tolist())
-
-    # Accommodation multipliers (global, so can use it everywhere)
-    accom_factors = {
-            'Hostel':  0.5,   # cheapest
-            'Hotel':   1.0,   # mid-range
-            'Airbnb':  0.8,   # slightly cheaper than Hotel
-            'Resort':  1.5    # most expensive
-        }
-
+    
     # Feature Engineering
     def engineer_features(df):
         df = df.copy()
@@ -117,13 +109,6 @@ if data is not None:
         df['DayOfWeek'] = df['StartDate'].dt.dayofweek  # Monday=0, Sunday=6
         df['IsWeekend'] = df['DayOfWeek'].isin([5,6]).astype(int)
         df['IsPeakSeason'] = df['Month'].isin([6,7,8,12]).astype(int)
-        accom_factors = {
-            'Hostel': 0.5,    # cheapest
-            'Hotel': 1.0,     # mid-range
-            'Airbnb': 0.8,    # slightly below hotel
-            'Resort': 1.5     # priciest
-            }
-        df['AccomFactor'] = df['AccommodationType'].map(accom_factors)
         return df
 
     engineered_data = engineer_features(data)
@@ -196,7 +181,6 @@ if data is not None:
     # Prepare features and target
     features = ['Destination', 'Duration', 'AccommodationType', 'TravelerNationality', 
                 'Month', 'IsWeekend', 'IsPeakSeason']
-    features.append('AccomFactor')
     target = 'Cost'
 
     X = engineered_data[features]
@@ -205,7 +189,6 @@ if data is not None:
     # Preprocessing
     categorical_features = ['Destination', 'AccommodationType', 'TravelerNationality']
     numeric_features = ['Duration', 'Month', 'IsWeekend', 'IsPeakSeason']
-    numeric_features.append('AccomFactor')
     preprocessor = ColumnTransformer([
         ('num', StandardScaler(), numeric_features),
         ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features),
@@ -293,12 +276,6 @@ if data is not None:
     if submitted:
         try:
             model = joblib.load('travel_cost_model.pkl')
-            accom_factors = {
-                    'Hostel': 0.5, 'Hotel': 1.0,
-                    'Airbnb': 0.8, 'Resort': 1.5
-                    }
-            
-            
             
             input_data = pd.DataFrame([{
                 'Destination': destination,
@@ -308,7 +285,6 @@ if data is not None:
                 'Month': month,
                 'IsWeekend': is_weekend,
                 'IsPeakSeason': is_peak_season
-                'AccomFactor': accom_factors[accommodation]
             }])
             
             prediction = model.predict(input_data)[0]
