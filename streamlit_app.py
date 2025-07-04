@@ -216,7 +216,7 @@ if data is not None:
             ('poly', PolynomialFeatures(degree=2, include_bias=False, interaction_only=True))
         ], numeric_features),
         ('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), categorical_features)
-    ])
+        )])
 
     # Enhanced model with feature selection
     model = Pipeline([
