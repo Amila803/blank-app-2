@@ -254,35 +254,36 @@ if data is not None:
     st.header("Cost Prediction")
     if submitted:
         try:
-            model = joblib.load('travel_cost_model.pkl')
-            
-            # Calculate necessary statistics from your data
-            destination_popularity = data['Destination'].value_counts(normalize=True).to_dict()
-            nationality_avg_cost = data.groupby('TravelerNationality')['Cost'].mean().to_dict()
-            
-            # Create input data with all required features
-            input_data = pd.DataFrame([{
-                'Destination': destination,
-                'Duration': duration,
-                'AccommodationType': accommodation,
-                'TravelerNationality': nationality,
-                'Month': month,
-                'IsWeekend': is_weekend,
-                'IsPeakSeason': is_peak_season,
-                # Add the engineered features
-                'DurationSquared': duration ** 2,
-                'LogDuration': np.log1p(duration),
-                'DestinationPopularity': destination_popularity.get(destination, 0.5),  # Default if not found
-                'NationalityAvgCost': nationality_avg_cost.get(nationality, data['Cost'].mean()),  # Default if not found
-                'PeakDuration': duration * is_peak_season,
-                'WeekendDuration': duration * is_weekend
-            }])
+        model = joblib.load('travel_cost_model.pkl')
+        
+        # Calculate necessary statistics from your data
+        destination_popularity = data['Destination'].value_counts(normalize=True).to_dict()
+        nationality_avg_cost = data.groupby('TravelerNationality')['Cost'].mean().to_dict()
+        
+        # Create input data with all required features
+        input_data = pd.DataFrame([{
+            'Destination': destination,
+            'Duration': duration,
+            'AccommodationType': accommodation,
+            'TravelerNationality': nationality,
+            'Month': month,
+            'IsWeekend': is_weekend,  # Fixed typo from 'IsWeekend' to match your model
+            'IsPeakSeason': is_peak_season,
+            'DurationSquared': duration ** 2,
+            'LogDuration': np.log1p(duration),
+            'DestinationPopularity': destination_popularity.get(destination, 0.5),
+            'NationalityAvgCost': nationality_avg_cost.get(nationality, data['Cost'].mean()),
+            'PeakDuration': duration * is_peak_season,
+            'WeekendDuration': duration * is_weekend
+        }])
         
         prediction = model.predict(input_data)[0]
         st.success(f"## Predicted Cost: ${prediction:,.2f}")
-        
+        st.session_state['accom_pred'] = prediction
+
     except Exception as e:
         st.error(f"Prediction failed: {str(e)}")
+ 
 
     
     with st.form("prediction_form"):
