@@ -263,53 +263,52 @@ if data is not None:
         
         submitted = st.form_submit_button("Calculate Accommodation Cost")
 
-    if submitted:
-        try:
-            model = joblib.load('travel_cost_model.pkl')
+   if submitted:
+    try:
+        model = joblib.load('travel_cost_model.pkl')
+        
+ 
+        input_data = pd.DataFrame([{
+            'Destination': destination,
+            'Duration': duration,
+            'AccommodationType': accommodation,
+            'TravelerNationality': nationality,
+            'Month': month,
+            'IsWeekend': is_weekend,
+            'IsPeakSeason': is_peak_season,
+            # Add any other features your model expects
+            'DestAvgCost': data[data['Destination']==destination]['Cost'].mean(),
+            'DestCount': data[data['Destination']==destination].shape[0],
+            'DestAvgDuration': data[data['Destination']==destination]['Duration'].mean()
+        }])
+        
+        # 2. Predict ONCE (daily rate)
+        daily_rate = model.predict(input_data)[0]
+        
+        # 3. Calculate total cost with discounts
+        total_cost = daily_rate * duration
+        if duration > 7:
+            total_cost *= 0.95  # 5% discount
+        if duration > 14:
+            total_cost *= 0.90  # 10% discount
             
-            # Predict DAILY RATE first
-            daily_rate = model.predict(input_data)[0]
+        # 4. Single consistent output
+        st.success(f"## Predicted Cost: ${total_cost:,.2f}")
+        st.subheader("Cost Breakdown")
+        st.write(f"Base daily rate: ${daily_rate:,.2f}")
+        st.write(f"Total for {duration} days: ${total_cost:,.2f}")
+        
+        if duration > 7:
+            st.write(f"✨ Includes {5 if duration >7 else 10}% long-stay discount")
+        if is_peak_season:
+            st.write("⚠️ Peak season surcharge applied")
+        if is_weekend:
+            st.write("⚠️ Weekend surcharge applied")
             
-            # Then calculate total
-            total_cost = daily_rate * duration
-            
-            # Apply reasonable discounts for longer stays
-            if duration > 7:
-                total_cost *= 0.95  # 5% discount
-            if duration > 14:
-                total_cost *= 0.90  # 10% discount
-                
-            st.success(f"## Predicted Cost: ${total_cost:,.2f}")
-            st.write(f"Daily rate: ${daily_rate:,.2f} × {duration} days = ${total_cost:,.2f}")
-            
-            input_data = pd.DataFrame([{
-                'Destination': destination,
-                'Duration': duration,
-                'AccommodationType': accommodation,
-                'TravelerNationality': nationality,
-                'Month': month,
-                'IsWeekend': is_weekend,
-                'IsPeakSeason': is_peak_season
-            }])
-            
-            prediction = model.predict(input_data)[0]
-            
-            st.success(f"## Predicted Cost: ${prediction:,.2f}")
-            st.session_state['accom_pred'] = prediction
-
-            # Show cost breakdown
-            st.subheader("Cost Breakdown")
-            base_cost = prediction / duration
-            st.write(f"Base daily cost: ${base_cost:,.2f}")
-            st.write(f"Total for {duration} days: ${base_cost * duration:,.2f}")
-            
-            if is_peak_season:
-                st.write("⚠️ Peak season surcharge applied")
-            if is_weekend:
-                st.write("⚠️ Weekend surcharge applied")
-                
-        except Exception as e:
-            st.error(f"Prediction failed: {str(e)}")
+        st.session_state['accom_pred'] = total_cost
+        
+    except Exception as e:
+        st.error(f"Prediction failed: {str(e)}")
 
     # Transport Prediction interface
     with st.form("transport_form"):
