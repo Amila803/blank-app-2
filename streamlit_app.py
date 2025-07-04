@@ -14,6 +14,7 @@ from datetime import datetime
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.compose import TransformedTargetRegressor
 from lightgbm import LGBMRegressor
+from sklearn.base import BaseEstimator, RegressorMixin
 
 # Set page config
 st.set_page_config(page_title="Travel Cost Predictor", page_icon="✈️", layout="wide")
@@ -21,81 +22,102 @@ st.set_page_config(page_title="Travel Cost Predictor", page_icon="✈️", layou
 # Title and description
 st.title("✈️ Travel Cost Predictor")
 st.markdown("""
-This app predicts travel costs based on actual travel data.
+This app predicts travel costs based on actual travel data with enforced business rules:
+1. More days = higher cost
+2. Resort is most expensive accommodation
+3. Hostel is cheapest accommodation
 """)
 
+class ConstrainedRandomForest(BaseEstimator, RegressorMixin):
+    def __init__(self, n_estimators=100, max_depth=None, min_samples_split=2, 
+                 min_samples_leaf=1, max_features='sqrt', bootstrap=True,
+                 accommodation_weights=None, duration_multiplier=1.0):
+        self.n_estimators = n_estimators
+        self.max_depth = max_depth
+        self.min_samples_split = min_samples_split
+        self.min_samples_leaf = min_samples_leaf
+        self.max_features = max_features
+        self.bootstrap = bootstrap
+        self.accommodation_weights = accommodation_weights or {}
+        self.duration_multiplier = duration_multiplier
+        self.model = RandomForestRegressor(
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            min_samples_split=min_samples_split,
+            min_samples_leaf=min_samples_leaf,
+            max_features=max_features,
+            bootstrap=bootstrap,
+            random_state=42
+        )
+    
+    def fit(self, X, y):
+        if isinstance(X, pd.DataFrame) and 'AccommodationType' in X.columns:
+            self.accommodation_categories_ = X['AccommodationType'].unique()
+        self.model.fit(X, y)
+        return self
+    
+    def predict(self, X):
+        base_pred = self.model.predict(X)
+        
+        if isinstance(X, pd.DataFrame):
+            # Apply accommodation type multipliers
+            if 'AccommodationType' in X.columns and self.accommodation_weights:
+                acc_types = X['AccommodationType']
+                acc_multipliers = acc_types.map(lambda x: self.accommodation_weights.get(x, 1.0)).values
+                base_pred = base_pred * acc_multipliers
+            
+            # Apply duration multiplier
+            if 'Duration' in X.columns:
+                duration_effect = 1 + (X['Duration'] - 7) * self.duration_multiplier  # 7 days as baseline
+                base_pred = base_pred * duration_effect
+        
+        return base_pred
+
 def remove_outliers(df, columns):
-    """
-    Remove outliers using IQR method for specified columns
-    Returns cleaned dataframe and information about removed outliers
-    """
     df_clean = df.copy()
     outlier_info = {}
     
     for col in columns:
         if col in df_clean.columns:
-            # Calculate IQR
             q1 = df_clean[col].quantile(0.25)
             q3 = df_clean[col].quantile(0.75)
             iqr = q3 - q1
-            
-            # Define bounds
             lower_bound = q1 - 1.5 * iqr
             upper_bound = q3 + 1.5 * iqr
-            
-            # Identify outliers
             outliers = df_clean[(df_clean[col] < lower_bound) | (df_clean[col] > upper_bound)]
             num_outliers = len(outliers)
-            
-            # Remove outliers
             df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
-            
-            # Store info
             outlier_info[col] = {
                 'lower_bound': lower_bound,
                 'upper_bound': upper_bound,
                 'num_outliers': num_outliers,
                 'percent_outliers': (num_outliers / len(df)) * 100
             }
-    
     return df_clean, outlier_info
 
-# Load data function
 @st.cache_resource
 def load_data():
     try:
-        # Load the dataset with proper encoding
         data = pd.read_csv("Travel_details_dataset.csv", encoding='utf-8-sig')
-        
-        # Remove completely empty rows
         data = data.dropna(how='all')
         
-        # Function to clean currency values
         def clean_currency(value):
             if isinstance(value, str):
-                # Remove USD, commas, and whitespace
-                value = value.replace('USD', '').replace(',', '').strip()
+                value = value.replace('USD', '').replace(',', '').replace('$', '').strip()
                 try:
                     return float(value)
                 except:
                     return None
             return value
         
-        # Clean cost columns
         for cost_col in ['Accommodation cost', 'Transportation cost']:
             data[cost_col] = data[cost_col].apply(clean_currency)
         
-        # Clean destination names (remove countries)
         data['Destination'] = data['Destination'].str.split(',').str[0].str.strip()
-        
-        # Convert dates - handle multiple date formats
         data['Start date'] = pd.to_datetime(data['Start date'], errors='coerce', format='mixed')
         data['End date'] = pd.to_datetime(data['End date'], errors='coerce', format='mixed')
-        
-        # Calculate duration
         data['Duration'] = (data['End date'] - data['Start date']).dt.days
         
-        # Standardize transport types
         transport_mapping = {
             'Plane': 'Flight',
             'Airplane': 'Flight',
@@ -104,7 +126,6 @@ def load_data():
         }
         data['Transportation type'] = data['Transportation type'].replace(transport_mapping)
         
-        # Rename columns to match your existing code
         data = data.rename(columns={
             'Traveler nationality': 'TravelerNationality',
             'Accommodation type': 'AccommodationType',
@@ -114,17 +135,14 @@ def load_data():
             'Start date': 'StartDate'
         })
         
-        # Filter only needed columns and drop rows with missing critical data
         data = data[[
             'Destination', 'Duration', 'StartDate', 'AccommodationType',
             'TravelerNationality', 'Cost', 'TransportType', 'TransportCost'
         ]].dropna(subset=['Cost', 'TransportCost'])
         
-        # Remove outliers from numerical columns
         numerical_cols = ['Duration', 'Cost', 'TransportCost']
         data_clean, outlier_info = remove_outliers(data, numerical_cols)
         
-        # Show outlier information
         if st.checkbox("Show Outlier Removal Information"):
             st.subheader("Outlier Removal Summary")
             for col, info in outlier_info.items():
@@ -134,16 +152,13 @@ def load_data():
                 st.write("---")
         
         return data_clean
-    
     except Exception as e:
         st.error(f"Error loading dataset: {str(e)}")
         return None
 
-# Load data
 data = load_data()
 
 if data is not None:
-    # Show data distribution after outlier removal
     st.subheader("Data Distribution After Outlier Removal")
     col1, col2 = st.columns(2)
     with col1:
@@ -158,26 +173,22 @@ if data is not None:
         ax.set_title("Duration Distribution")
         st.pyplot(fig)
 
-    # Update dropdown options based on actual data
     DESTINATIONS = sorted(data['Destination'].unique().tolist())
     TRANSPORT_TYPES = sorted(data['TransportType'].dropna().unique().tolist())
     NATIONALITIES = sorted(data['TravelerNationality'].dropna().unique().tolist())
     ACCOMMODATION_TYPES = sorted(data['AccommodationType'].dropna().unique().tolist())
     
-    # Feature Engineering
     def engineer_features(df):
         df = df.copy()
-        # Extract date features
         df['Year'] = df['StartDate'].dt.year
         df['Month'] = df['StartDate'].dt.month
-        df['DayOfWeek'] = df['StartDate'].dt.dayofweek  # Monday=0, Sunday=6
+        df['DayOfWeek'] = df['StartDate'].dt.dayofweek
         df['IsWeekend'] = df['DayOfWeek'].isin([5,6]).astype(int)
         df['IsPeakSeason'] = df['Month'].isin([6,7,8,12]).astype(int)
         return df
 
     engineered_data = engineer_features(data)
 
-    # Show data relationships
     st.header("Data Relationships")
     col1, col2 = st.columns(2)
     with col1:
@@ -193,20 +204,14 @@ if data is not None:
         monthly_avg.plot(kind='bar', ax=ax)
         st.pyplot(fig)
 
-    # --- TRANSPORTATION COST PREDICTION ---
-    st.header("🚆 Transportation Cost Prediction")
-
-    # Train transportation model
     @st.cache_resource
     def train_transport_model():
-        # Feature engineering
         transport_data = data[['Destination', 'TransportType', 'TravelerNationality', 'TransportCost', 'StartDate']].copy()
         transport_data['PeakSeason'] = pd.to_datetime(transport_data['StartDate']).dt.month.isin([6,7,8,12]).astype(int)
         
         X = transport_data[['Destination', 'TransportType', 'TravelerNationality', 'PeakSeason']]
         y = transport_data['TransportCost']
         
-        # Preprocessing
         preprocessor = ColumnTransformer(
             transformers=[
                 ('cat', OneHotEncoder(handle_unknown='ignore'), ['Destination', 'TransportType', 'TravelerNationality'])
@@ -228,7 +233,6 @@ if data is not None:
 
     transport_model = train_transport_model()
 
-    # Show transportation relationships
     st.subheader("Cost Patterns")
     col1, col2 = st.columns(2)
     with col1:
@@ -245,10 +249,6 @@ if data is not None:
         plt.xticks(rotation=45)
         st.pyplot(fig)
 
-    # --- ACCOMMODATION COST PREDICTION ---
-    st.header("Cost Prediction")
-
-    # Prepare features and target
     features = ['Destination', 'Duration', 'AccommodationType', 'TravelerNationality', 
                 'Month', 'IsWeekend', 'IsPeakSeason']
     target = 'Cost'
@@ -256,7 +256,6 @@ if data is not None:
     X = engineered_data[features]
     y = engineered_data[target]
 
-    # Preprocessing
     categorical_features = ['Destination', 'AccommodationType', 'TravelerNationality']
     numeric_features = ['Duration', 'Month', 'IsWeekend', 'IsPeakSeason']
     preprocessor = ColumnTransformer([
@@ -264,93 +263,111 @@ if data is not None:
         ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features),
     ])
 
-    # Model pipeline
-from sklearn.ensemble import GradientBoostingRegressor
-
-# Pipelines for lower, median, and upper quantiles
-quantiles = [0.1, 0.5, 0.9]
-models = {}
-
-for q in quantiles:
-    gbr = GradientBoostingRegressor(
-        loss='quantile',
-        alpha=q,
-        n_estimators=300,
-        learning_rate=0.05,
-        max_depth=5,
-        random_state=42
-    )
-    model_q = Pipeline(steps=[
-        ('preprocessor', preprocessor),
-        ('regressor', gbr)
-    ])
-    model_q.fit(X_train, y_train)
-    models[q] = model_q
-
-# Save all three models
-joblib.dump(models, 'quantile_models.pkl')
-
-
-    # Train model
-if st.button("Train Model"):
-    with st.spinner("Training Quantile Regression Models..."):
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-        from sklearn.ensemble import GradientBoostingRegressor
-
-        quantiles = [0.1, 0.5, 0.9]
-        models = {}
-
-        for q in quantiles:
-            gbr = GradientBoostingRegressor(
-                loss='quantile',
-                alpha=q,
-                n_estimators=300,
-                learning_rate=0.05,
-                max_depth=5,
-                random_state=42
-            )
-            model_q = Pipeline(steps=[
+    if st.button("Train Model"):
+        with st.spinner("Training model with constraints..."):
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+            
+            accommodation_weights = {
+                'Hostel': 0.8,
+                'Airbnb': 0.95,
+                'Hotel': 1.0,
+                'Resort': 1.3,
+                'Villa': 1.2,
+                'Guesthouse': 0.85,
+                'Vacation rental': 0.9
+            }
+            
+            duration_multiplier = 0.05
+            
+            constrained_model = Pipeline(steps=[
                 ('preprocessor', preprocessor),
-                ('regressor', gbr)
+                ('regressor', ConstrainedRandomForest(
+                    accommodation_weights=accommodation_weights,
+                    duration_multiplier=duration_multiplier,
+                    random_state=42
+                ))
             ])
-            model_q.fit(X_train, y_train)
-            models[q] = model_q
-
-        # Save the models dictionary
-        joblib.dump(models, 'quantile_models.pkl')
-        st.success("Quantile models trained and saved!")
-
-        # Evaluation
-        st.subheader("Model Evaluation")
-
-        y_pred_low = models[0.1].predict(X_test)
-        y_pred_med = models[0.5].predict(X_test)
-        y_pred_high = models[0.9].predict(X_test)
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("MAE (Median)", f"${mean_absolute_error(y_test, y_pred_med):.2f}")
-            st.metric("R² Score (Median)", f"{r2_score(y_test, y_pred_med):.2f}")
-
-        with col2:
-            fig, ax = plt.subplots()
-            ax.plot(y_test.values, label="Actual", linestyle='dotted')
-            ax.plot(y_pred_med, label="Median Prediction", color='blue')
-            ax.fill_between(
-                range(len(y_test)),
-                y_pred_low,
-                y_pred_high,
-                alpha=0.3,
-                color='lightblue',
-                label="80% Prediction Interval"
+            
+            param_distributions = {
+                'regressor__n_estimators': [100, 200, 300, 400, 500],
+                'regressor__max_depth': [None, 5, 10, 20, 30],
+                'regressor__min_samples_split': [2, 5, 10, 15],
+                'regressor__min_samples_leaf': [1, 2, 4, 6],
+                'regressor__max_features': ['sqrt', 'log2', None],
+                'regressor__bootstrap': [True, False]
+            }
+            
+            search = RandomizedSearchCV(
+                estimator=constrained_model,
+                param_distributions=param_distributions,
+                n_iter=50,
+                cv=5,
+                scoring='neg_mean_absolute_error',
+                n_jobs=-1,
+                random_state=42,
+                verbose=2
             )
-            ax.set_xlabel('Sample')
-            ax.set_ylabel('Cost')
-            ax.legend()
-            st.pyplot(fig)
+            
+            search.fit(X_train, y_train)
+            best_model = search.best_estimator_
+            
+            joblib.dump(best_model, 'travel_cost_model.pkl')
+            st.success("Model trained and saved with constraints!")
+            
+            st.subheader("Model Evaluation")
+            y_pred = best_model.predict(X_test)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("MAE", f"${mean_absolute_error(y_test, y_pred):.2f}")
+                st.metric("R² Score", f"{r2_score(y_test, y_pred):.2f}")
+            
+            with col2:
+                fig, ax = plt.subplots()
+                ax.scatter(y_test, y_pred, alpha=0.5)
+                ax.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
+                ax.set_xlabel('Actual Cost')
+                ax.set_ylabel('Predicted Cost')
+                st.pyplot(fig)
+            
+            st.subheader("Constraint Validation")
+            
+            test_data = X_test.iloc[:1].copy()
+            test_data['Duration'] = 7
+            
+            acc_test_results = []
+            for acc_type in ACCOMMODATION_TYPES:
+                test_data['AccommodationType'] = acc_type
+                pred = best_model.predict(test_data)[0]
+                acc_test_results.append((acc_type, pred))
+            
+            acc_test_results.sort(key=lambda x: x[1])
+            
+            st.write("**Accommodation Type Cost Ranking (7-day stay):**")
+            for acc_type, cost in acc_test_results:
+                st.write(f"- {acc_type}: ${cost:.2f}")
+            
+            if acc_test_results[-1][0] == 'Resort' and acc_test_results[0][0] == 'Hostel':
+                st.success("✓ Resort is most expensive, Hostel is cheapest")
+            else:
+                st.warning("Constraint not fully met - check accommodation weights")
+            
+            duration_test_results = []
+            test_data['AccommodationType'] = 'Hotel'
+            for days in [3, 5, 7, 10, 14]:
+                test_data['Duration'] = days
+                pred = best_model.predict(test_data)[0]
+                duration_test_results.append((days, pred))
+            
+            st.write("**Duration Impact on Cost (Hotel accommodation):**")
+            for days, cost in duration_test_results:
+                st.write(f"- {days} days: ${cost:.2f}")
+            
+            if all(x[1] < y[1] for x, y in zip(duration_test_results, duration_test_results[1:])):
+                st.success("✓ Cost increases with duration")
+            else:
+                st.warning("Duration constraint not fully met - check duration multiplier")
 
-    # Prediction Interface
     st.header("Cost Prediction")
 
     with st.form("prediction_form"):
@@ -366,54 +383,44 @@ if st.button("Train Model"):
         with col2:
             start_date = st.date_input("Start Date", datetime.today())
             month = start_date.month
-            day_of_week = start_date.weekday()  # Monday=0, Sunday=6
+            day_of_week = start_date.weekday()
             is_weekend = 1 if day_of_week >= 5 else 0
             is_peak_season = 1 if month in [6,7,8,12] else 0
         
         submitted = st.form_submit_button("Calculate Accommodation Cost")
 
-if submitted:
-    try:
-        models = joblib.load('quantile_models.pkl')  # Load all three quantile models
+    if submitted:
+        try:
+            model = joblib.load('travel_cost_model.pkl')
+            
+            input_data = pd.DataFrame([{
+                'Destination': destination,
+                'Duration': duration,
+                'AccommodationType': accommodation,
+                'TravelerNationality': nationality,
+                'Month': month,
+                'IsWeekend': is_weekend,
+                'IsPeakSeason': is_peak_season
+            }])
+            
+            prediction = model.predict(input_data)[0]
+            
+            st.success(f"## Predicted Cost: ${prediction:,.2f}")
+            st.session_state['accom_pred'] = prediction
 
-        input_data = pd.DataFrame([{
-            'Destination': destination,
-            'Duration': duration,
-            'AccommodationType': accommodation,
-            'TravelerNationality': nationality,
-            'Month': month,
-            'IsWeekend': is_weekend,
-            'IsPeakSeason': is_peak_season
-        }])
+            st.subheader("Cost Breakdown")
+            base_cost = prediction / duration
+            st.write(f"Base daily cost: ${base_cost:,.2f}")
+            st.write(f"Total for {duration} days: ${base_cost * duration:,.2f}")
+            
+            if is_peak_season:
+                st.write("⚠️ Peak season surcharge applied")
+            if is_weekend:
+                st.write("⚠️ Weekend surcharge applied")
+                
+        except Exception as e:
+            st.error(f"Prediction failed: {str(e)}")
 
-        # Get predictions for all quantiles
-        pred_low = models[0.1].predict(input_data)[0]
-        pred_med = models[0.5].predict(input_data)[0]
-        pred_high = models[0.9].predict(input_data)[0]
-
-        st.success(f"## Predicted Cost Range: ${pred_low:,.2f} - ${pred_high:,.2f}")
-        st.info(f"🟦 Median Prediction: ${pred_med:,.2f}")
-
-        st.session_state['accom_pred'] = pred_med
-
-        # Show cost breakdown
-        st.subheader("Cost Breakdown")
-        base_cost = pred_med / duration
-        st.write(f"Base daily cost: ${base_cost:,.2f}")
-        st.write(f"Total for {duration} days: ${base_cost * duration:,.2f}")
-
-        if is_peak_season:
-            st.write("⚠️ Peak season surcharge likely applied")
-        if is_weekend:
-            st.write("⚠️ Weekend surcharge likely applied")
-
-        st.subheader("Prediction Interval")
-        st.write(f"There's an 80% chance the cost falls between ${pred_low:,.2f} and ${pred_high:,.2f}")
-
-    except Exception as e:
-        st.error(f"Prediction failed: {str(e)}")
-
-    # Transport Prediction interface
     with st.form("transport_form"):
         st.subheader("Calculate Transportation Costs")
         
@@ -440,7 +447,6 @@ if submitted:
         st.success(f"### Estimated Transportation Cost: ${pred_cost:.2f}")
         st.session_state['trans_pred'] = pred_cost
 
-        # Show cost factors
         st.write("**Cost Factors:**")
         if is_peak:
             st.write("- Peak season surcharge applied")
@@ -449,7 +455,6 @@ if submitted:
         if trans_destination == 'Bali' and trans_type == 'Train':
             st.warning("Limited train options in Bali - consider flights or car rental")
 
-    # --- INTEGRATION ---
     st.header("💵 Combined Cost Prediction")
 
     if 'accom_pred' in st.session_state and 'trans_pred' in st.session_state:
