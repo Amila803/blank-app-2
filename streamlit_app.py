@@ -274,7 +274,7 @@ if data is not None:
     class ConstrainedRandomForest(BaseEstimator, RegressorMixin):
         def __init__(self, n_estimators=100, max_depth=None, min_samples_split=2, 
                      min_samples_leaf=1, max_features='sqrt', bootstrap=True,
-                     accommodation_weights=None, duration_multiplier=1.0):
+                     accommodation_weights=None, duration_multiplier=1.0, random_state=None):
             self.n_estimators = n_estimators
             self.max_depth = max_depth
             self.min_samples_split = min_samples_split
@@ -290,7 +290,7 @@ if data is not None:
                 min_samples_leaf=min_samples_leaf,
                 max_features=max_features,
                 bootstrap=bootstrap,
-                random_state=42
+                random_state=random_state
             )
         
         def fit(self, X, y):
