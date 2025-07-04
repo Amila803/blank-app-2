@@ -221,11 +221,11 @@ if data is not None:
 
     # Train model
     if st.button("Train Model"):
-    with st.spinner("Training model…"):
-        # 1) split
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
-        )
+        with st.spinner("Training model…"):
+            # 1) split
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42
+            )
 
         # 2) redefine pipeline to use log-transform + LGBM
         model = Pipeline([
