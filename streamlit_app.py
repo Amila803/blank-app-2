@@ -108,7 +108,7 @@ if data is not None:
     
 # Feature Engineering
 
-class FeatureEngineer(BaseEstimator, TransformerMixin):
+    class FeatureEngineer(BaseEstimator, TransformerMixin):
     def __init__(self):
         # instantiate holiday calendars 
         self.holidays_de = holidays.DE()
@@ -117,13 +117,10 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         return self
 
     def _check_holiday(self, row):
-        # example: treat 'StartDate' column for holiday lookup
         date = row['StartDate']
-        # use the appropriate calendar based on nationality if you like
         return int(date in self.holidays_de)
 
     def transform(self, X):
-        # make a copy so you don’t clobber the original
         X = X.copy()
 
         # —— Date features ——  
@@ -140,7 +137,6 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
 
         # —— Holiday features ——  
         if 'StartDate' in X.columns and 'TravelerNationality' in X.columns:
-            # or choose calendar based on nationality
             X['IsHoliday'] = X.apply(self._check_holiday, axis=1)
 
         # —— Seasonality flags ——  
@@ -165,8 +161,9 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
 
         return X
 
-    transport_model = train_transport_model()
 
+
+    transport_model = train_transport_model()
 
     
     def _check_holiday(self, row):
