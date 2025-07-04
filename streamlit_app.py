@@ -136,11 +136,11 @@ if data is not None:
     fig, ax = plt.subplots(1, 2, figsize=(10, 3.5))
     
     sns.histplot(data['Cost'] / data['Duration'], ax=ax[0], kde=True)
-    ax[0].set_title('Daily Rates Distribution')
+    ax[0].set_title('Daily Rates Distribution (Outliers Removed)')
     ax[0].set_xlabel('Daily Rate')
     
     sns.histplot(data['TransportCost'], ax=ax[1], kde=True)
-    ax[1].set_title('Transport Costs Distribution')
+    ax[1].set_title('Transport Costs Distribution (Outliers Removed)')
     ax[1].set_xlabel('Transport Cost')
     
     plt.tight_layout()
