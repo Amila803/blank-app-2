@@ -242,86 +242,61 @@ if data is not None:
         with st.spinner("Training model..."):
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             
-            # Hyperparameter tuning
+            #Stacking
 
-            param_distributions = {
-                'regressor__n_estimators':       [100, 200, 300, 400, 500],
-                'regressor__max_depth':          [None, 5, 10, 20, 30],
-                'regressor__min_samples_split':  [2, 5, 10, 15],
-                'regressor__min_samples_leaf':   [1, 2, 4, 6],
-                'regressor__max_features':       ['sqrt', 'log2', None],
-                'regressor__bootstrap':          [True, False]
-            }
-
-             # More comprehensive parameter grid
-            param_grid = {
-                'stacking__lgbm__n_estimators': [100, 200, 300],
-                'stacking__lgbm__learning_rate': [0.01, 0.05, 0.1],
-                'stacking__lgbm__max_depth': [3, 5, 7],
-                'stacking__xgb__n_estimators': [100, 200],
-                'stacking__xgb__max_depth': [3, 5],
-                'stacking__rf__n_estimators': [100, 200],
-                'stacking__rf__max_depth': [5, 10]
-            }
-            
-            search = RandomizedSearchCV(
-                model,
-                param_grid,
-                n_iter=50,
-                cv=5,
-                scoring='neg_mean_absolute_error',
-                n_jobs=-1,
-                random_state=42
-            )
-            
-            search.fit(X, y)
-
-            best_model = search.best_estimator_
-            st.write("🔑 Best params:", search.best_params_)
-           
-            # Stacking multiple models
             base_models = [
                 ('lgbm', LGBMRegressor(random_state=42)),
                 ('xgb', XGBRegressor(random_state=42)),
                 ('rf', RandomForestRegressor(random_state=42))
             ]
+        
+        model = Pipeline([
+            ('preprocessor', preprocessor),
+            ('stacking', StackingRegressor(
+                estimators=base_models,
+                final_estimator=LinearRegression(),
+                cv=5,
+                n_jobs=-1
+            ))
+        ])
+        
+        # Parameter grid for Stacking approach
+        param_grid = {
+            'stacking__lgbm__n_estimators': [100, 200, 300],
+            'stacking__lgbm__learning_rate': [0.01, 0.05, 0.1],
+            'stacking__lgbm__max_depth': [3, 5, 7],
+            'stacking__xgb__n_estimators': [100, 200],
+            'stacking__xgb__max_depth': [3, 5],
+            'stacking__rf__n_estimators': [100, 200],
+            'stacking__rf__max_depth': [5, 10]
+        }
+
+         search.fit(X_train, y_train)
+        
+        best_model = search.best_estimator_
+        st.write("🔑 Best params:", search.best_params_)
+        
+        # Save model
+        joblib.dump(best_model, 'travel_cost_model.pkl')
+        st.success("Model trained and saved!")
+
+        # Evaluation
+        st.subheader("Model Evaluation")
+        y_pred = best_model.predict(X_test)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("MAE", f"${mean_absolute_error(y_test, y_pred):.2f}")
+            st.metric("R² Score", f"{r2_score(y_test, y_pred):.2f}")
+        
+        with col2:
+            fig, ax = plt.subplots()
+            ax.scatter(y_test, y_pred, alpha=0.5)
+            ax.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
+            ax.set_xlabel('Actual Cost')
+            ax.set_ylabel('Predicted Cost')
+            st.pyplot(fig)
             
-            model = Pipeline([
-                ('preprocessor', preprocessor),
-                ('stacking', StackingRegressor(
-                    estimators=base_models,
-                    final_estimator=LinearRegression(),
-                    cv=5,
-                    n_jobs=-1
-                ))
-            ])
-
-            return search.best_estimator_
-
-            search.fit(X_train, y_train)
-            
-
-            # Save model
-            joblib.dump(best_model, 'travel_cost_model.pkl')
-            st.success("Model trained and saved!")
-
-            # Evaluation
-            st.subheader("Model Evaluation")
-            y_pred = best_model.predict(X_test)
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("MAE", f"${mean_absolute_error(y_test, y_pred):.2f}")
-                st.metric("R² Score", f"{r2_score(y_test, y_pred):.2f}")
-            
-            with col2:
-                fig, ax = plt.subplots()
-                ax.scatter(y_test, y_pred, alpha=0.5)
-                ax.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
-                ax.set_xlabel('Actual Cost')
-                ax.set_ylabel('Predicted Cost')
-                st.pyplot(fig)
-
     # Prediction Interface
     st.header("Cost Prediction")
 
