@@ -106,57 +106,67 @@ if data is not None:
     NATIONALITIES = sorted(data['TravelerNationality'].dropna().unique().tolist())
     ACCOMMODATION_TYPES = sorted(data['AccommodationType'].dropna().unique().tolist())
     
-    # Feature Engineering
+# Feature Engineering
 
-    class FeatureEngineer(BaseEstimator, TransformerMixin):
-        def __init__(self):
-            
-            self.holidays_de = holidays.DE()
+class FeatureEngineer(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        # instantiate holiday calendars 
+        self.holidays_de = holidays.DE()
 
-        def fit(self, X, y=None):
-            # no fitting to do, just return self
-            return self
-    
-        def transform(self, X):
-            # your transformation logic goes here
-            # e.g. X['is_holiday'] = X['date'].apply(lambda d: d in self.holidays_de)
-            return X
-        
-        # Date features (only if StartDate exists)
+    def fit(self, X, y=None):
+        return self
+
+    def _check_holiday(self, row):
+        # example: treat 'StartDate' column for holiday lookup
+        date = row['StartDate']
+        # use the appropriate calendar based on nationality if you like
+        return int(date in self.holidays_de)
+
+    def transform(self, X):
+        # make a copy so you don’t clobber the original
+        X = X.copy()
+
+        # —— Date features ——  
         if 'StartDate' in X.columns:
-            X['Year'] = X['StartDate'].dt.year
-            X['Month'] = X['StartDate'].dt.month
-            X['Day'] = X['StartDate'].dt.day
-            X['DayOfWeek'] = X['StartDate'].dt.dayofweek
-            X['IsWeekend'] = X['DayOfWeek'].isin([5,6]).astype(int)
-            X['Quarter'] = X['StartDate'].dt.quarter
-            X['DayOfYear'] = X['StartDate'].dt.dayofyear
-            X['WeekOfYear'] = X['StartDate'].dt.isocalendar().week
+            X['Year']        = X['StartDate'].dt.year
+            X['Month']       = X['StartDate'].dt.month
+            X['Day']         = X['StartDate'].dt.day
+            X['DayOfWeek']   = X['StartDate'].dt.dayofweek
+            X['IsWeekend']   = X['DayOfWeek'].isin([5,6]).astype(int)
+            X['Quarter']     = X['StartDate'].dt.quarter
+            X['DayOfYear']   = X['StartDate'].dt.dayofyear
+            X['WeekOfYear']  = X['StartDate'].dt.isocalendar().week
             X = X.drop('StartDate', axis=1)
-        
-        # Holiday features
-        if 'TravelerNationality' in X.columns:
+
+        # —— Holiday features ——  
+        if 'StartDate' in X.columns and 'TravelerNationality' in X.columns:
+            # or choose calendar based on nationality
             X['IsHoliday'] = X.apply(self._check_holiday, axis=1)
-        
-        # Seasonality
+
+        # —— Seasonality flags ——  
         if 'Month' in X.columns:
-            X['IsPeakSeason'] = X['Month'].isin([6,7,8,12]).astype(int)
+            X['IsPeakSeason']     = X['Month'].isin([6,7,8,12]).astype(int)
             X['IsShoulderSeason'] = X['Month'].isin([4,5,9,10]).astype(int)
-            X['IsLowSeason'] = X['Month'].isin([1,2,3,11]).astype(int)
-        
-        # Duration features (only if Duration exists)
+            X['IsLowSeason']      = X['Month'].isin([1,2,3,11]).astype(int)
+
+        # —— Duration features ——  
         if 'Duration' in X.columns:
-            X['LogDuration'] = np.log1p(X['Duration'])
+            X['LogDuration']  = np.log1p(X['Duration'])
             X['SqrtDuration'] = np.sqrt(X['Duration'])
-            X['DurationBins'] = pd.cut(X['Duration'], 
-                                     bins=[0,3,7,14,30,90],
-                                     labels=['0-3','4-7','8-14','15-30','30+'])
+            X['DurationBins'] = pd.cut(
+                X['Duration'],
+                bins=[0,3,7,14,30,90],
+                labels=['0-3','4-7','8-14','15-30','30+']
+            )
             if 'IsPeakSeason' in X.columns:
                 X['PeakDuration'] = X['IsPeakSeason'] * X['Duration']
             if 'IsWeekend' in X.columns:
                 X['WeekendDuration'] = X['IsWeekend'] * X['Duration']
-        
-            return X
+
+        return X
+
+
+
     
     def _check_holiday(self, row):
         if 'StartDate' not in row or pd.isna(row['StartDate']):
