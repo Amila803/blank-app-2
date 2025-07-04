@@ -134,20 +134,20 @@ def engineer_features(df):
 
     # Train transportation model
     @st.cache_resource
-def train_transport_model():
-    transport_data = data[['Destination', 'TransportType', 'TravelerNationality', 'TransportCost']].copy()
-    transport_data['PeakSeason'] = pd.to_datetime(data['StartDate']).dt.month.isin([6,7,8,12]).astype(int)
-    X = transport_data[['Destination', 'TransportType', 'TravelerNationality', 'PeakSeason']]
-    y = transport_data['TransportCost']
-    preprocessor = ColumnTransformer([
-        ('cat', OneHotEncoder(handle_unknown='ignore'), ['Destination', 'TransportType', 'TravelerNationality'])
-    ])
-    model = Pipeline([
-        ('preprocessor', preprocessor),
-        ('regressor', RandomForestRegressor(random_state=42))
-    ])
-    model.fit(X, y)
-    return model
+    def train_transport_model():
+        transport_data = data[['Destination', 'TransportType', 'TravelerNationality', 'TransportCost']].copy()
+        transport_data['PeakSeason'] = pd.to_datetime(data['StartDate']).dt.month.isin([6,7,8,12]).astype(int)
+        X = transport_data[['Destination', 'TransportType', 'TravelerNationality', 'PeakSeason']]
+        y = transport_data['TransportCost']
+        preprocessor = ColumnTransformer([
+            ('cat', OneHotEncoder(handle_unknown='ignore'), ['Destination', 'TransportType', 'TravelerNationality'])
+        ])
+        model = Pipeline([
+            ('preprocessor', preprocessor),
+            ('regressor', RandomForestRegressor(random_state=42))
+        ])
+        model.fit(X, y)
+        return model
 
     transport_model = train_transport_model()
 
