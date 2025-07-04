@@ -22,7 +22,6 @@ from sklearn.feature_selection import RFECV
 from sklearn.preprocessing import PolynomialFeatures
 
 
-
 # Set page config
 st.set_page_config(page_title="Travel Cost Predictor", page_icon="✈️", layout="wide")
 
@@ -114,32 +113,9 @@ if data is not None:
         # Extract date features
         df['Year'] = df['StartDate'].dt.year
         df['Month'] = df['StartDate'].dt.month
-        df['DayOfMonth'] = df['StartDate'].dt.day
-        df['DayOfWeek'] = df['StartDate'].dt.dayofweek
+        df['DayOfWeek'] = df['StartDate'].dt.dayofweek  # Monday=0, Sunday=6
         df['IsWeekend'] = df['DayOfWeek'].isin([5,6]).astype(int)
-        
-        # More sophisticated seasonality
-        seasons = [(12, 1, 2), (3, 4, 5), (6, 7, 8), (9, 10, 11)]
-        season_names = ['Winter', 'Spring', 'Summer', 'Fall']
-        for i, months in enumerate(seasons):
-            df[f'Is{season_names[i]}'] = df['Month'].isin(months).astype(int)
-        
-        # Holiday periods
-        df['IsHoliday'] = ((df['Month'] == 12) & (df['DayOfMonth'].between(15, 31))) | \
-                          ((df['Month'] == 1) & (df['DayOfMonth'].between(1, 7)))
-        
-        # Duration features
-        df['LogDuration'] = np.log1p(df['Duration'])
-        df['DurationSquared'] = df['Duration'] ** 2
-        
-        # Destination popularity
-        dest_counts = df['Destination'].value_counts(normalize=True)
-        df['DestinationPopularity'] = df['Destination'].map(dest_counts)
-        
-        # Traveler nationality frequency
-        nationality_counts = df['TravelerNationality'].value_counts(normalize=True)
-        df['NationalityFrequency'] = df['TravelerNationality'].map(nationality_counts)
-       
+        df['IsPeakSeason'] = df['Month'].isin([6,7,8,12]).astype(int)
         return df
 
     engineered_data = engineer_features(data)
@@ -226,12 +202,9 @@ if data is not None:
     st.header("Cost Prediction")
 
     # Prepare features and target
-    features = ['Destination', 'Duration', 'AccommodationType', 'TravelerNationality',
-               'Month', 'IsWeekend', 'IsPeakSeason', 'IsSummer', 'IsWinter',
-               'IsHoliday', 'DurationSquared', 'LogDuration',
-               'DestinationPopularity', 'NationalityFrequency']
+    features = ['Destination', 'Duration', 'AccommodationType', 'TravelerNationality', 
+                'Month', 'IsWeekend', 'IsPeakSeason']
     target = 'Cost'
-    
 
     X = engineered_data[features]
     y = engineered_data[target]
@@ -267,7 +240,6 @@ if data is not None:
         ))
     ])
 
-            
     # Enhanced Hyperparameter Tuning
     param_distributions = {
         'feature_selection__estimator__max_depth': [3, 5, 7],
@@ -346,8 +318,8 @@ if data is not None:
 
             # Save model
             joblib.dump(best_model, 'travel_cost_model.pkl')
-            st.success("Model trained and saved!")        
-          
+            st.success("Model trained and saved!")
+
     # Prediction Interface
     st.header("Cost Prediction")
 
