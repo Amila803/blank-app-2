@@ -174,8 +174,7 @@ if data is not None:
         st.pyplot(fig)
 
     # --- ACCOMMODATION COST PREDICTION ---
-    st.header("🏨 Accommodation Cost Prediction")
-
+    
     # Prepare features and target
     features = ['Destination', 'Duration', 'AccommodationType', 'TravelerNationality', 
                 'Month', 'IsWeekend', 'IsPeakSeason']
@@ -238,8 +237,10 @@ if data is not None:
     # Prediction Interface
     st.header("Cost Prediction")
 
+    st.header("🏨 Accommodation Cost Prediction")
+
     with st.form("prediction_form"):
-        st.subheader("Enter Trip Details")
+        st.subheader("Calculate Accommodation Costs")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -291,6 +292,8 @@ if data is not None:
             st.error(f"Prediction failed: {str(e)}")
 
     # Transport Prediction interface
+    st.header("🚗Transportation Cost Prediction")
+
     with st.form("transport_form"):
         st.subheader("Calculate Transportation Costs")
         
