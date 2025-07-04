@@ -100,27 +100,27 @@ if data is not None:
     # Feature Engineering
     def engineer_features(df):
         df = df.copy()
-        # Existing features
+        # Existing date features
         df['Year'] = df['StartDate'].dt.year
         df['Month'] = df['StartDate'].dt.month
         df['DayOfWeek'] = df['StartDate'].dt.dayofweek
         df['IsWeekend'] = df['DayOfWeek'].isin([5,6]).astype(int)
         df['IsPeakSeason'] = df['Month'].isin([6,7,8,12]).astype(int)
         
-        # Add the missing features
-        df['DurationSquared'] = df['Duration'] ** 2
+        # Create PER-DAY cost as new target variable
+        df['CostPerDay'] = df['Cost'] / df['Duration']
+        
+        # Add duration transformations
         df['LogDuration'] = np.log1p(df['Duration'])
+        df['ReciprocalDuration'] = 1 / df['Duration']
         
-        # You'll need to calculate these based on your data
-        # For prediction, you might need to use average values or pre-calculated values
-        destination_popularity = df['Destination'].value_counts(normalize=True).to_dict()
-        nationality_avg_cost = df.groupby('TravelerNationality')['Cost'].mean().to_dict()
-        
-        df['DestinationPopularity'] = df['Destination'].map(destination_popularity)
-        df['NationalityAvgCost'] = df['TravelerNationality'].map(nationality_avg_cost)
-        df['PeakDuration'] = df['Duration'] * df['IsPeakSeason']
-        df['WeekendDuration'] = df['Duration'] * df['IsWeekend']
-        
+        # Destination-specific features
+        destination_stats = df.groupby('Destination').agg({
+            'Cost': ['mean', 'count'],
+            'Duration': 'mean'
+        })
+        destination_stats.columns = ['DestAvgCost', 'DestCount', 'DestAvgDuration']
+        df = df.merge(destination_stats, on='Destination', how='left')
         return df
 
     engineered_data = engineer_features(data)
@@ -191,12 +191,15 @@ if data is not None:
     st.header("🏨 Accommodation Cost Prediction")
 
     # Prepare features and target
-    features = ['Destination', 'Duration', 'AccommodationType', 'TravelerNationality', 
-                'Month', 'IsWeekend', 'IsPeakSeason']
-    target = 'Cost'
 
+    features = ['Destination', 'Duration', 'AccommodationType', 'TravelerNationality', 
+                'Month', 'IsWeekend', 'IsPeakSeason', 'DestAvgCost', 'DestCount', 'DestAvgDuration']
+    target = 'CostPerDay'  
+    
     X = engineered_data[features]
     y = engineered_data[target]
+
+# Rest of your training code remains the same...
 
     # Preprocessing
     categorical_features = ['Destination', 'AccommodationType', 'TravelerNationality']
@@ -271,35 +274,46 @@ if data is not None:
         
         submitted = st.form_submit_button("Calculate Accommodation Cost")
     
-    if submitted:
-        try:
-            model = joblib.load('travel_cost_predictor.pkl')
-            
-            # Calculate necessary statistics from your data
-            destination_popularity = data['Destination'].value_counts(normalize=True).to_dict()
-            nationality_avg_cost = data.groupby('TravelerNationality')['Cost'].mean().to_dict()
-            
-            # Create input data with all required features
-            input_data = pd.DataFrame([{
-                'Destination': destination,
-                'Duration': duration,
-                'AccommodationType': accommodation,
-                'TravelerNationality': nationality,
-                'Month': month,
-                'IsWeekend': is_weekend,
-                'IsPeakSeason': is_peak_season,
-                'DurationSquared': duration ** 2,
-                'LogDuration': np.log1p(duration),
-                'DestinationPopularity': destination_popularity.get(destination, 0.5),
-                'NationalityAvgCost': nationality_avg_cost.get(nationality, data['Cost'].mean()),
-                'PeakDuration': duration * is_peak_season,
-                'WeekendDuration': duration * is_weekend
-            }])
-            
-            prediction = model.predict(input_data)[0]
-            st.success(f"## Predicted Cost: ${prediction:,.2f}")
-            st.session_state['accom_pred'] = prediction
-
+        if submitted:
+            try:
+                model = joblib.load('travel_cost_model.pkl')
+                
+                # Get destination stats
+                dest_stats = data.groupby('Destination').agg({
+                    'Cost': ['mean', 'count'],
+                    'Duration': 'mean'
+                }).droplevel(0, axis=1)
+                
+                # Create input data
+                input_data = pd.DataFrame([{
+                    'Destination': destination,
+                    'Duration': duration,
+                    'AccommodationType': accommodation,
+                    'TravelerNationality': nationality,
+                    'Month': month,
+                    'IsWeekend': is_weekend,
+                    'IsPeakSeason': is_peak_season,
+                    'DestAvgCost': dest_stats.loc[destination, 'mean'] if destination in dest_stats.index else data['Cost'].mean(),
+                    'DestCount': dest_stats.loc[destination, 'count'] if destination in dest_stats.index else 1,
+                    'DestAvgDuration': dest_stats.loc[destination, 'mean'] if destination in dest_stats.index else data['Duration'].mean()
+                }])
+                
+                # Predict COST PER DAY
+                cost_per_day = model.predict(input_data)[0]
+                
+                # Calculate TOTAL COST
+                total_cost = cost_per_day * duration
+                
+                # Apply non-linear scaling for longer stays
+                if duration > 7:  # Example: discount for stays longer than a week
+                    total_cost *= 0.95  # 5% discount
+                if duration > 14:
+                    total_cost *= 0.93  # Additional 2% discount
+                    
+                st.success(f"## Predicted Cost: ${total_cost:,.2f}")
+                st.write(f"Breakdown: ${cost_per_day:,.2f}/day × {duration} days")
+                st.session_state['accom_pred'] = total_cost
+                
         except Exception as e:
             st.error(f"Prediction failed: {str(e)}")
 
