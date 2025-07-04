@@ -3,13 +3,14 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import joblib
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-import joblib
+from sklearn.base import BaseEstimator, RegressorMixin
 from datetime import datetime
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.compose import TransformedTargetRegressor
@@ -270,13 +271,89 @@ if data is not None:
         ('regressor', RandomForestRegressor(random_state=42))
     ])
 
+    class ConstrainedRandomForest(BaseEstimator, RegressorMixin):
+        def __init__(self, n_estimators=100, max_depth=None, min_samples_split=2, 
+                     min_samples_leaf=1, max_features='sqrt', bootstrap=True,
+                     accommodation_weights=None, duration_multiplier=1.0):
+            self.n_estimators = n_estimators
+            self.max_depth = max_depth
+            self.min_samples_split = min_samples_split
+            self.min_samples_leaf = min_samples_leaf
+            self.max_features = max_features
+            self.bootstrap = bootstrap
+            self.accommodation_weights = accommodation_weights
+            self.duration_multiplier = duration_multiplier
+            self.model = RandomForestRegressor(
+                n_estimators=n_estimators,
+                max_depth=max_depth,
+                min_samples_split=min_samples_split,
+                min_samples_leaf=min_samples_leaf,
+                max_features=max_features,
+                bootstrap=bootstrap,
+                random_state=42
+            )
+        
+        def fit(self, X, y):
+            # Store accommodation type categories
+            if isinstance(X, pd.DataFrame) and 'AccommodationType' in X.columns:
+                self.accommodation_categories_ = X['AccommodationType'].unique()
+            
+            self.model.fit(X, y)
+            return self
+        
+        def predict(self, X):
+            base_pred = self.model.predict(X)
+            
+            # Apply constraints
+            if isinstance(X, pd.DataFrame):
+                # Apply accommodation type multipliers
+                if 'AccommodationType' in X.columns and self.accommodation_weights:
+                    acc_types = X['AccommodationType']
+                    acc_multipliers = acc_types.map(self.accommodation_weights).values
+                    base_pred = base_pred * acc_multipliers
+                
+                # Apply duration multiplier
+                if 'Duration' in X.columns:
+                    base_pred = base_pred * (1 + (X['Duration'] - X['Duration'].mean()) * self.duration_multiplier)
+            
+        return base_pred
+    
     # Train model
     if st.button("Train Model"):
-        with st.spinner("Training model..."):
+        with st.st.spinner("Training model..."):
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             
+            # Define accommodation type weights (resort most expensive, hostel cheapest)
+            accommodation_weights = {
+                'Hostel': 0.8,  # 20% cheaper than average
+                'Airbnb': 0.95,
+                'Hotel': 1.0,   # Baseline
+                'Resort': 1.3,  # 30% more expensive
+                'Villa': 1.2,
+                'Guesthouse': 0.85,
+                'Vacation rental': 0.9
+            }
+            
+            # Duration multiplier (5% increase per day)
+            duration_multiplier = 0.05
+            
+            # Create preprocessor
+            preprocessor = ColumnTransformer([
+                ('num', StandardScaler(), numeric_features),
+                ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features),
+            ])
+            
+            # Create constrained model
+            constrained_model = Pipeline(steps=[
+                ('preprocessor', preprocessor),
+                ('regressor', ConstrainedRandomForest(
+                    accommodation_weights=accommodation_weights,
+                    duration_multiplier=duration_multiplier,
+                    random_state=42
+                ))
+            ])
+            
             # Hyperparameter tuning
-
             param_distributions = {
                 'regressor__n_estimators': [100, 200, 300, 400, 500],
                 'regressor__max_depth': [None, 5, 10, 20, 30],
@@ -287,7 +364,7 @@ if data is not None:
             }
             
             search = RandomizedSearchCV(
-                estimator=model,
+                estimator=constrained_model,
                 param_distributions=param_distributions,
                 n_iter=50,
                 cv=5,
@@ -296,12 +373,12 @@ if data is not None:
                 random_state=42,
                 verbose=2
             )
-
-
-
-            search.fit(X_train, y_train)
             
+            search.fit(X_train, y_train)
             best_model = search.best_estimator_
+    
+                
+            
             st.write("🔑 Best params:", search.best_params_)
             
             # Save model
