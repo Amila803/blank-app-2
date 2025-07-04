@@ -107,6 +107,11 @@ if data is not None:
         df['DayOfWeek'] = df['StartDate'].dt.dayofweek  # Monday=0, Sunday=6
         df['IsWeekend'] = df['DayOfWeek'].isin([5,6]).astype(int)
         df['IsPeakSeason'] = df['Month'].isin([6,7,8,12]).astype(int)
+        df['CostPerDay'] = df['Cost'] / df['Duration']
+    
+        # Add duration features to help the model
+        df['LogDuration'] = np.log1p(df['Duration'])
+        df['ReciprocalDuration'] = 1 / df['Duration']
         return df
 
     engineered_data = engineer_features(data)
@@ -177,10 +182,11 @@ if data is not None:
     st.header("🏨 Accommodation Cost Prediction")
 
     # Prepare features and target
+    # Change the target to CostPerDay instead of Cost
     features = ['Destination', 'Duration', 'AccommodationType', 'TravelerNationality', 
                 'Month', 'IsWeekend', 'IsPeakSeason']
-    target = 'Cost'
-
+    target = 'CostPerDay'  # Changed from 'Cost'
+    
     X = engineered_data[features]
     y = engineered_data[target]
 
@@ -260,6 +266,21 @@ if data is not None:
     if submitted:
         try:
             model = joblib.load('travel_cost_model.pkl')
+            
+            # Predict DAILY RATE first
+            daily_rate = model.predict(input_data)[0]
+            
+            # Then calculate total
+            total_cost = daily_rate * duration
+            
+            # Apply reasonable discounts for longer stays
+            if duration > 7:
+                total_cost *= 0.95  # 5% discount
+            if duration > 14:
+                total_cost *= 0.90  # 10% discount
+                
+            st.success(f"## Predicted Cost: ${total_cost:,.2f}")
+            st.write(f"Daily rate: ${daily_rate:,.2f} × {duration} days = ${total_cost:,.2f}")
             
             input_data = pd.DataFrame([{
                 'Destination': destination,
