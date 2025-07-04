@@ -264,7 +264,7 @@ if data is not None:
         submitted = st.form_submit_button("Calculate Accommodation Cost")
 
        if submitted:
-        try:
+           try:
             model = joblib.load('travel_cost_model.pkl')
             
      
