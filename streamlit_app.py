@@ -378,7 +378,7 @@ with st.form("transport_form"):
     
     col1, col2 = st.columns(2)
     with col1:
-        trans_destination = st.selectbox("Destination", DESTINATIONS, key='trans_dest')
+        trans_destination = st.selectbox("Destination", list(transport_costs.keys()), key='trans_dest')
         trans_type = st.selectbox("Transportation Type", TRANSPORT_TYPES, key='trans_type')
     with col2:
         trans_nationality = st.selectbox("Nationality", NATIONALITIES, key='trans_nat')
