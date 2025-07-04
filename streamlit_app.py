@@ -99,7 +99,15 @@ if data is not None:
     TRANSPORT_TYPES = sorted(data['TransportType'].dropna().unique().tolist())
     NATIONALITIES = sorted(data['TravelerNationality'].dropna().unique().tolist())
     ACCOMMODATION_TYPES = sorted(data['AccommodationType'].dropna().unique().tolist())
-    
+
+    # Accommodation multipliers (global, so can use it everywhere)
+    accom_factors = {
+            'Hostel':  0.5,   # cheapest
+            'Hotel':   1.0,   # mid-range
+            'Airbnb':  0.8,   # slightly cheaper than Hotel
+            'Resort':  1.5    # most expensive
+        }
+
     # Feature Engineering
     def engineer_features(df):
         df = df.copy()
