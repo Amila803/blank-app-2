@@ -112,6 +112,9 @@ if data is not None:
         df['DayOfWeek'] = df['StartDate'].dt.dayofweek  # Monday=0, Sunday=6
         df['IsWeekend'] = df['DayOfWeek'].isin([5,6]).astype(int)
         df['IsPeakSeason'] = df['Month'].isin([6,7,8,12]).astype(int)
+        df['SeasonMultiplier']   = df['IsPeakSeason'].map({0:1,1:1.2})
+        df['DestMultiplier']     = df['Destination'].map(dest_mean / max_cost)
+        df['HolidayMultiplier']  = df['IsHoliday'].map({0:1,1:1.3})
         return df
 
     engineered_data = engineer_features(data)
@@ -207,7 +210,8 @@ if data is not None:
 
     # Preprocessing
     categorical_features = ['Destination', 'AccommodationType', 'TravelerNationality']
-    numeric_features = ['Duration', 'Month', 'IsWeekend', 'IsPeakSeason']
+    numeric_features += ['AccomFactor','SeasonMultiplier','DestMultiplier','HolidayMultiplier']
+
     preprocessor = ColumnTransformer([
         ('num', StandardScaler(), numeric_features),
         ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features),
