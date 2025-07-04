@@ -27,15 +27,72 @@ st.markdown("""
 This app predicts travel costs based on actual travel data.
 """)
 
+def remove_outliers(df, columns):
+    """
+    Remove outliers using IQR method for specified columns
+    Returns cleaned dataframe and information about removed outliers
+    """
+    df_clean = df.copy()
+    outlier_info = {}
+    
+    for col in columns:
+        if col in df_clean.columns:
+            # Calculate IQR
+            q1 = df_clean[col].quantile(0.25)
+            q3 = df_clean[col].quantile(0.75)
+            iqr = q3 - q1
+            
+            # Define bounds
+            lower_bound = q1 - 1.5 * iqr
+            upper_bound = q3 + 1.5 * iqr
+            
+            # Identify outliers
+            outliers = df_clean[(df_clean[col] < lower_bound) | (df_clean[col] > upper_bound)]
+            num_outliers = len(outliers)
+            
+            # Remove outliers
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+            
+            # Store info
+            outlier_info[col] = {
+                'lower_bound': lower_bound,
+                'upper_bound': upper_bound,
+                'num_outliers': num_outliers,
+                'percent_outliers': (num_outliers / len(df)) * 100
+            }
+    
+    return df_clean, outlier_info
+
 # Load data function
 @st.cache_data
 def load_data():
     try:
-        # Load the dataset with proper encoding
-        data = pd.read_csv("Travel_details_dataset.csv", encoding='utf-8-sig')
+        # [Previous data loading code remains the same until the end of cleaning]
         
-        # Remove completely empty rows
-        data = data.dropna(how='all')
+        # Filter only needed columns and drop rows with missing critical data
+        data = data[[
+            'Destination', 'Duration', 'StartDate', 'AccommodationType',
+            'TravelerNationality', 'Cost', 'TransportType', 'TransportCost'
+        ]].dropna(subset=['Cost', 'TransportCost'])
+        
+        # Remove outliers from numerical columns
+        numerical_cols = ['Duration', 'Cost', 'TransportCost']
+        data_clean, outlier_info = remove_outliers(data, numerical_cols)
+        
+        # Show outlier information
+        if st.checkbox("Show Outlier Removal Information"):
+            st.subheader("Outlier Removal Summary")
+            for col, info in outlier_info.items():
+                st.write(f"**{col}**:")
+                st.write(f"- Removed {info['num_outliers']} outliers ({info['percent_outliers']:.2f}%)")
+                st.write(f"- Lower bound: {info['lower_bound']:.2f}, Upper bound: {info['upper_bound']:.2f}")
+                st.write("---")
+        
+        return data_clean
+    
+    except Exception as e:
+        st.error(f"Error loading dataset: {str(e)}")
+        return None
         
         # Function to clean currency values
         def clean_currency(value):
