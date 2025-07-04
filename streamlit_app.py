@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -266,65 +265,90 @@ if data is not None:
     ])
 
     # Model pipeline
-    model = Pipeline(steps=[
+from sklearn.ensemble import GradientBoostingRegressor
+
+# Pipelines for lower, median, and upper quantiles
+quantiles = [0.1, 0.5, 0.9]
+models = {}
+
+for q in quantiles:
+    gbr = GradientBoostingRegressor(
+        loss='quantile',
+        alpha=q,
+        n_estimators=300,
+        learning_rate=0.05,
+        max_depth=5,
+        random_state=42
+    )
+    model_q = Pipeline(steps=[
         ('preprocessor', preprocessor),
-        ('regressor', RandomForestRegressor(random_state=42))
+        ('regressor', gbr)
     ])
+    model_q.fit(X_train, y_train)
+    models[q] = model_q
+
+# Save all three models
+joblib.dump(models, 'quantile_models.pkl')
+
 
     # Train model
-    if st.button("Train Model"):
-        with st.spinner("Training model..."):
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-            
-            # Hyperparameter tuning
+if st.button("Train Model"):
+    with st.spinner("Training Quantile Regression Models..."):
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-            param_distributions = {
-                'regressor__n_estimators': [100, 200, 300, 400, 500],
-                'regressor__max_depth': [None, 5, 10, 20, 30],
-                'regressor__min_samples_split': [2, 5, 10, 15],
-                'regressor__min_samples_leaf': [1, 2, 4, 6],
-                'regressor__max_features': ['sqrt', 'log2', None],
-                'regressor__bootstrap': [True, False]
-            }
-            
-            search = RandomizedSearchCV(
-                estimator=model,
-                param_distributions=param_distributions,
-                n_iter=50,
-                cv=5,
-                scoring='neg_mean_absolute_error',
-                n_jobs=-1,
-                random_state=42,
-                verbose=2
+        from sklearn.ensemble import GradientBoostingRegressor
+
+        quantiles = [0.1, 0.5, 0.9]
+        models = {}
+
+        for q in quantiles:
+            gbr = GradientBoostingRegressor(
+                loss='quantile',
+                alpha=q,
+                n_estimators=300,
+                learning_rate=0.05,
+                max_depth=5,
+                random_state=42
             )
+            model_q = Pipeline(steps=[
+                ('preprocessor', preprocessor),
+                ('regressor', gbr)
+            ])
+            model_q.fit(X_train, y_train)
+            models[q] = model_q
 
+        # Save the models dictionary
+        joblib.dump(models, 'quantile_models.pkl')
+        st.success("Quantile models trained and saved!")
 
+        # Evaluation
+        st.subheader("Model Evaluation")
 
-            search.fit(X_train, y_train)
-            
-            best_model = search.best_estimator_
-            st.write("🔑 Best params:", search.best_params_)
-            
-            # Save model
-            joblib.dump(best_model, 'travel_cost_model.pkl')
-            st.success("Model trained and saved!")
+        y_pred_low = models[0.1].predict(X_test)
+        y_pred_med = models[0.5].predict(X_test)
+        y_pred_high = models[0.9].predict(X_test)
 
-            # Evaluation
-            st.subheader("Model Evaluation")
-            y_pred = best_model.predict(X_test)
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("MAE", f"${mean_absolute_error(y_test, y_pred):.2f}")
-                st.metric("R² Score", f"{r2_score(y_test, y_pred):.2f}")
-            
-            with col2:
-                fig, ax = plt.subplots()
-                ax.scatter(y_test, y_pred, alpha=0.5)
-                ax.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
-                ax.set_xlabel('Actual Cost')
-                ax.set_ylabel('Predicted Cost')
-                st.pyplot(fig)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("MAE (Median)", f"${mean_absolute_error(y_test, y_pred_med):.2f}")
+            st.metric("R² Score (Median)", f"{r2_score(y_test, y_pred_med):.2f}")
+
+        with col2:
+            fig, ax = plt.subplots()
+            ax.plot(y_test.values, label="Actual", linestyle='dotted')
+            ax.plot(y_pred_med, label="Median Prediction", color='blue')
+            ax.fill_between(
+                range(len(y_test)),
+                y_pred_low,
+                y_pred_high,
+                alpha=0.3,
+                color='lightblue',
+                label="80% Prediction Interval"
+            )
+            ax.set_xlabel('Sample')
+            ax.set_ylabel('Cost')
+            ax.legend()
+            st.pyplot(fig)
 
     # Prediction Interface
     st.header("Cost Prediction")
@@ -348,38 +372,46 @@ if data is not None:
         
         submitted = st.form_submit_button("Calculate Accommodation Cost")
 
-    if submitted:
-        try:
-            model = joblib.load('travel_cost_model.pkl')
-            
-            input_data = pd.DataFrame([{
-                'Destination': destination,
-                'Duration': duration,
-                'AccommodationType': accommodation,
-                'TravelerNationality': nationality,
-                'Month': month,
-                'IsWeekend': is_weekend,
-                'IsPeakSeason': is_peak_season
-            }])
-            
-            prediction = model.predict(input_data)[0]
-            
-            st.success(f"## Predicted Cost: ${prediction:,.2f}")
-            st.session_state['accom_pred'] = prediction
+if submitted:
+    try:
+        models = joblib.load('quantile_models.pkl')  # Load all three quantile models
 
-            # Show cost breakdown
-            st.subheader("Cost Breakdown")
-            base_cost = prediction / duration
-            st.write(f"Base daily cost: ${base_cost:,.2f}")
-            st.write(f"Total for {duration} days: ${base_cost * duration:,.2f}")
-            
-            if is_peak_season:
-                st.write("⚠️ Peak season surcharge applied")
-            if is_weekend:
-                st.write("⚠️ Weekend surcharge applied")
-                
-        except Exception as e:
-            st.error(f"Prediction failed: {str(e)}")
+        input_data = pd.DataFrame([{
+            'Destination': destination,
+            'Duration': duration,
+            'AccommodationType': accommodation,
+            'TravelerNationality': nationality,
+            'Month': month,
+            'IsWeekend': is_weekend,
+            'IsPeakSeason': is_peak_season
+        }])
+
+        # Get predictions for all quantiles
+        pred_low = models[0.1].predict(input_data)[0]
+        pred_med = models[0.5].predict(input_data)[0]
+        pred_high = models[0.9].predict(input_data)[0]
+
+        st.success(f"## Predicted Cost Range: ${pred_low:,.2f} - ${pred_high:,.2f}")
+        st.info(f"🟦 Median Prediction: ${pred_med:,.2f}")
+
+        st.session_state['accom_pred'] = pred_med
+
+        # Show cost breakdown
+        st.subheader("Cost Breakdown")
+        base_cost = pred_med / duration
+        st.write(f"Base daily cost: ${base_cost:,.2f}")
+        st.write(f"Total for {duration} days: ${base_cost * duration:,.2f}")
+
+        if is_peak_season:
+            st.write("⚠️ Peak season surcharge likely applied")
+        if is_weekend:
+            st.write("⚠️ Weekend surcharge likely applied")
+
+        st.subheader("Prediction Interval")
+        st.write(f"There's an 80% chance the cost falls between ${pred_low:,.2f} and ${pred_high:,.2f}")
+
+    except Exception as e:
+        st.error(f"Prediction failed: {str(e)}")
 
     # Transport Prediction interface
     with st.form("transport_form"):
