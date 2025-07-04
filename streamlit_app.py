@@ -118,8 +118,7 @@ if data is not None:
         df['IsSpring'] = df['Month'].isin([3,4,5]).astype(int)
         df['IsFall'] = df['Month'].isin([9,10,11]).astype(int)
 
-        df['IsChristmas'] = ((df['Month'] == 12) & (df['DayOfMonth'] >= 15)).astype(int)
-        df['IsNewYear'] = ((df['Month'] == 1) & (df['DayOfMonth'] <= 7)).astype(int)
+
 
             # Duration features
         df['DurationSquared'] = df['Duration'] ** 2
