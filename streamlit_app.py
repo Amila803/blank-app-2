@@ -205,9 +205,11 @@ if data is not None:
             
             # Hyperparameter tuning
             param_grid = {
-                'regressor__n_estimators': [100, 200],
-                'regressor__max_depth': [None, 10, 20],
-                'regressor__min_samples_split': [2, 5]
+            'regressor__n_estimators':    [200, 300, 400],
+            'regressor__max_depth':       [10, 20, 30, None],
+            'regressor__min_samples_split':[2, 5, 10],
+            'regressor__max_features':    ['sqrt', 'log2'],
+            # even min_samples_leaf, bootstrap, etc.
             }
             
             grid_search = GridSearchCV(model, param_grid, cv=5, scoring='neg_mean_squared_error')
