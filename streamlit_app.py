@@ -116,6 +116,56 @@ if data is not None:
 
     engineered_data = engineer_features(data)
 
+                        # --- 1. Build Engineered DataFrame ---
+        df = engineered_data.copy()
+        
+        # Outlier removal on Cost
+        Q1, Q3 = df['Cost'].quantile([0.25, 0.75])
+        IQR = Q3 - Q1
+        df = df[~((df['Cost'] < Q1 - 1.5*IQR) | (df['Cost'] > Q3 + 1.5*IQR))]
+        
+        # Add group means
+        df['Dest_MeanCost']  = df.groupby('Destination')['Cost'].transform('mean')
+        df['Month_MeanCost'] = df.groupby('Month')['Cost'].transform('mean')
+        
+        # Optionally switch to daily‐rate target
+        df['DailyCost'] = df['Cost'] / df['Duration']
+        
+        # Features & target
+        FEATURES = [
+            'Destination','AccommodationType','TravelerNationality',
+            'Duration','Month','DayOfWeek','IsWeekend','IsPeakSeason',
+            'Dest_MeanCost','Month_MeanCost'
+        ]
+        TARGET = 'DailyCost'  # or 'Cost' if you prefer
+        
+        X = df[FEATURES]
+        y = df[TARGET]
+        
+        # --- 2. Preprocessing & Model Pipeline ---
+        # Numeric & categorical splits
+        numeric_feats = ['Duration','Month','DayOfWeek','IsWeekend','IsPeakSeason',
+                         'Dest_MeanCost','Month_MeanCost']
+        cat_feats     = ['Destination','AccommodationType','TravelerNationality']
+        
+        preprocessor = ColumnTransformer([
+            ('num',    StandardScaler(), numeric_feats),
+            ('target_enc', TargetEncoder(), cat_feats),
+        ])
+        
+        lgbm = LGBMRegressor(random_state=42, n_jobs=-1)
+        
+        # Wrap in log‐transform if modeling Cost directly
+        model = Pipeline([
+            ('pre', preprocessor),
+            ('reg', TransformedTargetRegressor(
+                regressor=lgbm,
+                func=np.log1p,
+                inverse_func=np.expm1
+            ))
+        ])
+
+
     # Show data relationships
     st.header("Data Relationships")
     col1, col2 = st.columns(2)
