@@ -117,7 +117,7 @@ if data is not None:
     engineered_data = engineer_features(data)
 
                         # --- 1. Build Engineered DataFrame ---
-        df = engineered_data.copy()
+    df = engineered_data.copy()
         
         # Outlier removal on Cost
         Q1, Q3 = df['Cost'].quantile([0.25, 0.75])
