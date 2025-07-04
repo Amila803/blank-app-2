@@ -109,12 +109,12 @@ if data is not None:
         df['DayOfWeek'] = df['StartDate'].dt.dayofweek  # Monday=0, Sunday=6
         df['IsWeekend'] = df['DayOfWeek'].isin([5,6]).astype(int)
         df['IsPeakSeason'] = df['Month'].isin([6,7,8,12]).astype(int)
-         accom_factors = {
-        'Hostel': 0.5,    # cheapest
-        'Hotel': 1.0,     # medium
-        'Airbnb': 0.8,    # slightly cheaper than Hotel
-        'Resort': 1.5     # most expensive
-        }
+        accom_factors = {
+                'Hostel': 0.5,    # cheapest
+                'Hotel': 1.0,     # medium
+                'Airbnb': 0.8,    # slightly cheaper than Hotel
+                'Resort': 1.5     # most expensive
+                }
         df['AccomFactor'] = df['AccommodationType'].map(accom_factors)
         return df
 
