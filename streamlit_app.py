@@ -116,31 +116,22 @@ if data is not None:
 
     engineered_data = engineer_features(data)
 
-                        # --- 1. Build Engineered DataFrame ---
+    # --- 1. Build Engineered DataFrame ---
     df = engineered_data.copy()
+    
+    # Outlier removal on Cost
+    Q1, Q3 = df['Cost'].quantile([0.25, 0.75])
+    IQR = Q3 - Q1
+    df = df[~((df['Cost'] < Q1 - 1.5*IQR) | (df['Cost'] > Q3 + 1.5*IQR))]
+    
+    # Add group means
+    df['Dest_MeanCost']  = df.groupby('Destination')['Cost'].transform('mean')
+    df['Month_MeanCost'] = df.groupby('Month')['Cost'].transform('mean')
+    
+    # Optionally switch to daily‐rate target
+    df['DailyCost'] = df['Cost'] / df['Duration']
         
-        # Outlier removal on Cost
-        Q1, Q3 = df['Cost'].quantile([0.25, 0.75])
-        IQR = Q3 - Q1
-        df = df[~((df['Cost'] < Q1 - 1.5*IQR) | (df['Cost'] > Q3 + 1.5*IQR))]
-        
-        # Add group means
-        df['Dest_MeanCost']  = df.groupby('Destination')['Cost'].transform('mean')
-        df['Month_MeanCost'] = df.groupby('Month')['Cost'].transform('mean')
-        
-        # Optionally switch to daily‐rate target
-        df['DailyCost'] = df['Cost'] / df['Duration']
-        
-        # Features & target
-        FEATURES = [
-            'Destination','AccommodationType','TravelerNationality',
-            'Duration','Month','DayOfWeek','IsWeekend','IsPeakSeason',
-            'Dest_MeanCost','Month_MeanCost'
-        ]
-        TARGET = 'DailyCost'  # or 'Cost' if you prefer
-        
-        X = df[FEATURES]
-        y = df[TARGET]
+ 
         
         # --- 2. Preprocessing & Model Pipeline ---
         # Numeric & categorical splits
