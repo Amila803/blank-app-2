@@ -256,21 +256,20 @@ if data is not None:
             is_peak_season = 1 if month in [6,7,8,12] else 0
         
         submitted = st.form_submit_button("Calculate Accommodation Cost")
-
-   if submitted:
-        try:
-            model = joblib.load('travel_cost_model.pkl')
-            
-            # Predict for 1 day first to get base rate
-            input_data_1day = pd.DataFrame([{
-                'Destination': destination,
-                'Duration': 1,  # Predict for 1 day
-                'AccommodationType': accommodation,
-                'TravelerNationality': nationality,
-                'Month': month,
-                'IsWeekend': is_weekend,
-                'IsPeakSeason': is_peak_season
-            }])
+if submitted:
+    try:
+        model = joblib.load('travel_cost_model.pkl')
+        
+        # Predict for 1 day first to get base rate
+        input_data_1day = pd.DataFrame([{
+            'Destination': destination,
+            'Duration': 1,  # Predict for 1 day
+            'AccommodationType': accommodation,
+            'TravelerNationality': nationality,
+            'Month': month,
+            'IsWeekend': is_weekend,
+            'IsPeakSeason': is_peak_season
+        }])
         
         base_cost = model.predict(input_data_1day)[0]
         
