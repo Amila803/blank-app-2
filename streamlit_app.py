@@ -214,7 +214,7 @@ if data is not None:
         # Feature engineering
         transport_data = data[['Destination', 'TransportType', 'TravelerNationality', 'TransportCost', 'StartDate']].copy()
     
-            # Add Duration with a default value if it doesn't exist
+        # Add Duration with a default value if it doesn't exist
             if 'Duration' not in transport_data.columns:
                 transport_data['Duration'] = 1  # Default duration for transportation
                 
