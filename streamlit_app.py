@@ -156,7 +156,26 @@ if data is not None:
     ACCOMMODATION_TYPES = sorted(data['AccommodationType'].dropna().unique().tolist())
     NATIONALITIES = sorted(data['TravelerNationality'].dropna().unique().tolist())
     TRANSPORT_TYPES = sorted(data['TransportType'].dropna().unique().tolist())
-
+   
+    # Month vs Cost Visualization
+    st.subheader("Monthly Accommodation Cost Distribution")
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.boxplot(data=engineered_data, x='Month', y='Cost', ax=ax)
+    ax.set_title('Monthly Distribution of Accommodation Costs')
+    ax.set_xlabel('Month')
+    ax.set_ylabel('Accommodation Cost (USD)')
+    st.pyplot(fig)
+    
+    # Transport Type vs Cost Visualization
+    st.subheader("Transportation Type vs Cost")
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.boxplot(data=engineered_data, x='TransportType', y='TransportCost', ax=ax)
+    ax.set_title('Transportation Cost by Transport Type')
+    ax.set_xlabel('Type of Transport')
+    ax.set_ylabel('Transportation Cost (USD)')
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
+        
     # Model training
     st.header("Model Training")
     if st.button("Train Models"):
