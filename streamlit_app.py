@@ -229,7 +229,7 @@ if data is not None:
             best_model = grid_search.best_estimator_
             
             # Save model
-            joblib.dump(best_model, 'travel_cost_model.pkl')
+            joblib.dump(best_model, 'travel_cost_predictor.pkl')
             st.success("Model trained and saved!")
 
             # Evaluation
@@ -273,7 +273,7 @@ if data is not None:
     
     if submitted:
         try:
-            model = joblib.load('travel_cost_model.pkl')
+            model = joblib.load('travel_cost_predictor.pkl')
             
             # Calculate necessary statistics from your data
             destination_popularity = data['Destination'].value_counts(normalize=True).to_dict()
