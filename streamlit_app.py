@@ -67,7 +67,7 @@ class ConstrainedRandomForest(BaseEstimator, RegressorMixin):
         
         return base_pred
 
-# Data loading and cleaning with outlier removal
+# Data loading and cleaning
 @st.cache_resource
 def load_data():
     try:
@@ -127,7 +127,7 @@ data = load_data()
 
 if data is not None:
     # Show data summary with outliers removed
-    st.subheader("Data Summary After Outlier Removal")
+    st.subheader("Data Summary")
     st.write(f"Total records: {len(data)}")
     st.write("Sample data:")
     st.dataframe(data.head())
