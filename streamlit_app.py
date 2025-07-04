@@ -107,11 +107,6 @@ if data is not None:
         df['DayOfWeek'] = df['StartDate'].dt.dayofweek  # Monday=0, Sunday=6
         df['IsWeekend'] = df['DayOfWeek'].isin([5,6]).astype(int)
         df['IsPeakSeason'] = df['Month'].isin([6,7,8,12]).astype(int)
-        df['CostPerDay'] = df['Cost'] / df['Duration']
-    
-        # Add duration features to help the model
-        df['LogDuration'] = np.log1p(df['Duration'])
-        df['ReciprocalDuration'] = 1 / df['Duration']
         return df
 
     engineered_data = engineer_features(data)
@@ -182,11 +177,10 @@ if data is not None:
     st.header("🏨 Accommodation Cost Prediction")
 
     # Prepare features and target
-    # Change the target to CostPerDay instead of Cost
     features = ['Destination', 'Duration', 'AccommodationType', 'TravelerNationality', 
                 'Month', 'IsWeekend', 'IsPeakSeason']
-    target = 'CostPerDay'  # Changed from 'Cost'
-    
+    target = 'Cost'
+
     X = engineered_data[features]
     y = engineered_data[target]
 
@@ -262,12 +256,11 @@ if data is not None:
             is_peak_season = 1 if month in [6,7,8,12] else 0
         
         submitted = st.form_submit_button("Calculate Accommodation Cost")
-        
-        if submitted:
-           try:
+
+    if submitted:
+        try:
             model = joblib.load('travel_cost_model.pkl')
             
-     
             input_data = pd.DataFrame([{
                 'Destination': destination,
                 'Duration': duration,
@@ -275,38 +268,26 @@ if data is not None:
                 'TravelerNationality': nationality,
                 'Month': month,
                 'IsWeekend': is_weekend,
-                'IsPeakSeason': is_peak_season,
-                # Add any other features your model expects
-                'DestAvgCost': data[data['Destination']==destination]['Cost'].mean(),
-                'DestCount': data[data['Destination']==destination].shape[0],
-                'DestAvgDuration': data[data['Destination']==destination]['Duration'].mean()
+                'IsPeakSeason': is_peak_season
             }])
             
-            # 2. Predict ONCE (daily rate)
-            daily_rate = model.predict(input_data)[0]
+            prediction = model.predict(input_data)[0]
             
-            # 3. Calculate total cost with discounts
-            total_cost = daily_rate * duration
-            if duration > 7:
-                total_cost *= 0.95  # 5% discount
-            if duration > 14:
-                total_cost *= 0.90  # 10% discount
-                
-            # 4. Single consistent output
-            st.success(f"## Predicted Cost: ${total_cost:,.2f}")
+            st.success(f"## Predicted Cost: ${prediction:,.2f}")
+            st.session_state['accom_pred'] = prediction
+
+            # Show cost breakdown
             st.subheader("Cost Breakdown")
-            st.write(f"Base daily rate: ${daily_rate:,.2f}")
-            st.write(f"Total for {duration} days: ${total_cost:,.2f}")
+            base_cost = prediction / duration
+            st.write(f"Base daily cost: ${base_cost:,.2f}")
+            st.write(f"Total for {duration} days: ${base_cost * duration:,.2f}")
             
-            if duration > 7:
-                st.write(f"✨ Includes {5 if duration >7 else 10}% long-stay discount")
             if is_peak_season:
                 st.write("⚠️ Peak season surcharge applied")
             if is_weekend:
                 st.write("⚠️ Weekend surcharge applied")
                 
-            st.session_state['accom_pred'] = total_cost
-           except Exception as e:
+        except Exception as e:
             st.error(f"Prediction failed: {str(e)}")
 
     # Transport Prediction interface
