@@ -19,7 +19,13 @@ st.set_page_config(page_title="Travel Cost Predictor", page_icon="✈️", layou
 
 # Title and description
 st.title("✈️ Travel Cost Predictor")
-
+st.markdown("""
+Predict travel costs with these enforced rules:
+1. Daily rate stays constant
+2. Total = Daily rate × Nights
+3. Resort most expensive, Hostel cheapest
+4. Flights most expensive transport
+""")
 
 # Custom constrained model class
 class ConstrainedRandomForest(BaseEstimator, RegressorMixin):
@@ -136,6 +142,10 @@ if data is not None:
                                    'IsPeakSeason']]
             y_acc = engineered_data['Cost'] / engineered_data['Duration']  # Daily rate
             
+            X_train, X_test, y_train, y_test = train_test_split(
+                X_acc, y_acc, test_size=0.2, random_state=42
+            )
+            
             preprocessor = ColumnTransformer([
                 ('num', StandardScaler(), ['Month', 'IsWeekend', 'IsPeakSeason']),
                 ('cat', OneHotEncoder(handle_unknown='ignore'), 
@@ -147,22 +157,66 @@ if data is not None:
                 ('regressor', ConstrainedRandomForest(random_state=42))
             ])
             
-            model.fit(X_acc, y_acc)
+            model.fit(X_train, y_train)
             joblib.dump(model, 'accommodation_model.pkl')
+            
+            # Evaluate accommodation model
+            y_pred = model.predict(X_test)
+            mae = mean_absolute_error(y_test, y_pred)
+            r2 = r2_score(y_test, y_pred)
             
             # Transport model
             X_trans = engineered_data[['Destination', 'TransportType', 
                                      'TravelerNationality', 'IsPeakSeason']]
             y_trans = engineered_data['TransportCost']
             
+            X_train_trans, X_test_trans, y_train_trans, y_test_trans = train_test_split(
+                X_trans, y_trans, test_size=0.2, random_state=42
+            )
+            
             trans_model = Pipeline([
                 ('encoder', OneHotEncoder(handle_unknown='ignore')),
                 ('regressor', LGBMRegressor())
             ])
-            trans_model.fit(X_trans, y_trans)
+            trans_model.fit(X_train_trans, y_train_trans)
             joblib.dump(trans_model, 'transport_model.pkl')
             
+            # Evaluate transport model
+            y_pred_trans = trans_model.predict(X_test_trans)
+            mae_trans = mean_absolute_error(y_test_trans, y_pred_trans)
+            r2_trans = r2_score(y_test_trans, y_pred_trans)
+            
+            # Display metrics
             st.success("Models trained successfully!")
+            st.subheader("Model Performance")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Accommodation Model MAE", f"${mae:.2f}")
+                st.metric("Accommodation R² Score", f"{r2:.2f}")
+                
+                # Plot actual vs predicted for accommodation
+                fig, ax = plt.subplots()
+                ax.scatter(y_test, y_pred, alpha=0.5)
+                ax.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'k--')
+                ax.set_xlabel('Actual Daily Rate')
+                ax.set_ylabel('Predicted Daily Rate')
+                ax.set_title('Accommodation Model')
+                st.pyplot(fig)
+            
+            with col2:
+                st.metric("Transport Model MAE", f"${mae_trans:.2f}")
+                st.metric("Transport R² Score", f"{r2_trans:.2f}")
+                
+                # Plot actual vs predicted for transport
+                fig, ax = plt.subplots()
+                ax.scatter(y_test_trans, y_pred_trans, alpha=0.5)
+                ax.plot([y_test_trans.min(), y_test_trans.max()], 
+                        [y_test_trans.min(), y_test_trans.max()], 'k--')
+                ax.set_xlabel('Actual Transport Cost')
+                ax.set_ylabel('Predicted Transport Cost')
+                ax.set_title('Transport Model')
+                st.pyplot(fig)
 
     # Prediction UI
     st.header("Cost Prediction")
