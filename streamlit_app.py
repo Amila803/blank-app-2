@@ -277,9 +277,9 @@ if data is not None:
                 'PeakDuration': duration * is_peak_season,
                 'WeekendDuration': duration * is_weekend
             }])
-            
-            prediction = model.predict(input_data)[0]
-            st.success(f"## Predicted Cost: ${prediction:,.2f}")
+        
+        prediction = model.predict(input_data)[0]
+        st.success(f"## Predicted Cost: ${prediction:,.2f}")
         
     except Exception as e:
         st.error(f"Prediction failed: {str(e)}")
