@@ -321,5 +321,5 @@ def engineer_features(df):
         st.success(f"## Total Estimated Trip Cost: ${total_cost:.2f}")
         st.write(f"- Accommodation: ${st.session_state['accom_pred']:.2f}")
         st.write(f"- Transportation: ${st.session_state['trans_pred']:.2f}")
-else:
-    st.error("Failed to load dataset. Please check if 'Travel_details_dataset.csv' exists in the same directory.")
+    else:
+        st.error("Failed to load dataset. Please check if 'Travel_details_dataset.csv' exists in the same directory.")
