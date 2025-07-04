@@ -208,16 +208,16 @@ if data is not None:
     categorical_features = ['Destination', 'AccommodationType', 'TravelerNationality']
     numeric_features = ['Duration', 'Month', 'IsWeekend', 'IsPeakSeason', 'IsHolidaySeason',
                        'Duration_Peak', 'Duration_Weekend', 'DestinationPopularity']
-    
-    preprocessor = ColumnTransformer([
-        ('num', Pipeline([
-            ('imputer', SimpleImputer(strategy='median')),
-            ('scaler', RobustScaler()),
-            ('poly', PolynomialFeatures(degree=2, include_bias=False, interaction_only=True))
-        ], numeric_features),
-        ('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), categorical_features)
-        )])
 
+    preprocessor = ColumnTransformer([
+    ('num', Pipeline([
+        ('imputer', SimpleImputer(strategy='median')),
+        ('scaler', RobustScaler()),
+        ('poly', PolynomialFeatures(degree=2, include_bias=False, interaction_only=True))
+    ]), numeric_features),
+    ('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), categorical_features)
+        ])
+   
     # Enhanced model with feature selection
     model = Pipeline([
         ('preprocessor', preprocessor),
