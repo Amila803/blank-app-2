@@ -107,22 +107,9 @@ st.header("🚆 Transportation Cost Prediction")
 
 
 # Transportation type options
-TRANSPORT_TYPES = ['Flight', 'Train', 'Bus', 'Car rental', 'Ferry', 'Bike rental', 'Rideshare']
-NATIONALITIES = [
-    'American', 'British', 'Canadian', 'Australian', 'Japanese',
-    'Chinese', 'German', 'French', 'Italian', 'Spanish',
-    'Brazilian', 'Indian', 'Russian', 'South Korean', 'Mexican',
-    'Dutch', 'Swedish', 'Norwegian', 'Swiss', 'Singaporean',
-    'Thai', 'Vietnamese', 'Indonesian', 'Malaysian', 'Emirati'
-]
-DESTINATIONS = [
-    'London', 'Paris', 'Tokyo', 'New York', 'Bali',
-    'Sydney', 'Rome', 'Berlin', 'Barcelona', 'Dubai',
-    'Singapore', 'Hong Kong', 'Bangkok', 'Seoul', 'Istanbul',
-    'Cape Town', 'Rio de Janeiro', 'Toronto', 'Los Angeles', 'Mumbai',
-    'Amsterdam', 'Vienna', 'Prague', 'Athens', 'Cairo',
-    'Reykjavik', 'Hawaii', 'Santorini', 'Phuket', 'Marrakech'
-]
+TRANSPORT_TYPES = ['Flight', 'Train', 'Bus', 'Car rental']
+NATIONALITIES = ['American', 'British', 'Canadian', 'Australian', 'Japanese']
+DESTINATIONS = ['London', 'Paris', 'Tokyo', 'New York', 'Bali']
 
 # Load/generate transportation data
 @st.cache_data
@@ -130,78 +117,40 @@ def load_transport_data():
     np.random.seed(42)
     n_samples = 500
     
-    # Expanded base costs by destination and transport type
+    # Base costs by destination and transport type
     transport_costs = {
         'London': {'Flight': 400, 'Train': 150, 'Bus': 80, 'Car rental': 200},
         'Paris': {'Flight': 350, 'Train': 120, 'Bus': 60, 'Car rental': 180},
         'Tokyo': {'Flight': 800, 'Train': 250, 'Bus': 100, 'Car rental': 300},
         'New York': {'Flight': 500, 'Train': 100, 'Bus': 70, 'Car rental': 250},
-        'Bali': {'Flight': 700, 'Train': 50, 'Bus': 30, 'Car rental': 150},
-        'Phuket': {'Flight': 650, 'Train': 40, 'Bus': 35, 'Car rental': 120},
-        'Sydney': {'Flight': 750, 'Train': 180, 'Bus': 90, 'Car rental': 220},
-        'Rio de Janeiro': {'Flight': 600, 'Train': 90, 'Bus': 50, 'Car rental': 170},
-        'Amsterdam': {'Flight': 380, 'Train': 130, 'Bus': 65, 'Car rental': 190},
-        'Dubai': {'Flight': 450, 'Train': 60, 'Bus': 40, 'Car rental': 160}
+        'Bali': {'Flight': 700, 'Train': 50, 'Bus': 30, 'Car rental': 150}
     }
     
-    # Create cost relationships based on nationality and destination
+    # Nationality preferences (multipliers)
+    nationality_factors = {
+        'American': {'Flight': 1.0, 'Car rental': 1.2},
+        'British': {'Train': 1.3, 'Flight': 1.1},
+        'Canadian': {'Flight': 1.1, 'Car rental': 1.1},
+        'Japanese': {'Train': 1.4, 'Bus': 1.2},
+        'Australian': {'Flight': 1.2, 'Car rental': 0.9}
+    }
+    
     data = pd.DataFrame({
         'Destination': np.random.choice(DESTINATIONS, n_samples),
         'TransportType': np.random.choice(TRANSPORT_TYPES, n_samples),
         'Nationality': np.random.choice(NATIONALITIES, n_samples),
+        'BaseCost': [transport_costs[d][t] for d,t in zip(
+            np.random.choice(DESTINATIONS, n_samples),
+            np.random.choice(TRANSPORT_TYPES, n_samples)
+        )],
         'PeakSeason': np.random.choice([0,1], n_samples, p=[0.7,0.3])
     })
     
-    # Assign base costs
-    data['BaseCost'] = [transport_costs[d][t] for d,t in zip(data['Destination'], data['TransportType'])]
-    
-    # Create realistic cost variations based on actual relationships:
-    # 1. Flight costs vary by nationality's distance from destination
-    # 2. Local preferences affect costs (e.g., Japanese prefer trains in Japan)
-    # 3. Car rentals are generally cheaper for local nationalities
-    
-    # Calculate adjusted costs
-    def calculate_realistic_cost(row):
-        base_cost = row['BaseCost']
-        nationality = row['Nationality']
-        transport = row['TransportType']
-        destination = row['Destination']
-        
-        # Base adjustment factors
-        adjustments = {
-            'Flight': 1.0,
-            'Train': 1.0,
-            'Bus': 1.0,
-            'Car rental': 1.0
-        }
-        
-        # Distance-based adjustments for flights
-        if transport == 'Flight':
-            # Nationalities from far away pay more for flights
-            if nationality in ['Australian', 'New Zealander'] and destination in ['London', 'Paris', 'New York']:
-                adjustments['Flight'] *= 1.3
-            elif nationality in ['American', 'Canadian'] and destination in ['Tokyo', 'Bali']:
-                adjustments['Flight'] *= 1.2
-            elif nationality in ['Japanese', 'Chinese'] and destination in ['London', 'New York']:
-                adjustments['Flight'] *= 1.15
-        
-        # Local preferences adjustments
-        if transport == 'Train':
-            if (nationality == 'Japanese' and destination == 'Tokyo') or \
-               (nationality == 'British' and destination == 'London') or \
-               (nationality == 'French' and destination == 'Paris'):
-                adjustments['Train'] *= 0.9  # Locals get better train rates
-        
-        if transport == 'Car rental':
-            if nationality in ['American', 'Canadian'] and destination in ['New York', 'Los Angeles']:
-                adjustments['Car rental'] *= 0.85  # Domestic car rental discounts
-        
-        # Peak season adjustment
-        peak_adjustment = 1.2 if row['PeakSeason'] else 1.0
-        
-        return base_cost * adjustments[transport] * peak_adjustment
-    
-    data['TransportCost'] = data.apply(calculate_realistic_cost, axis=1)
+    # Apply nationality preferences and peak season markup
+    data['TransportCost'] = data['BaseCost'] * \
+        [nationality_factors[row['Nationality']].get(row['TransportType'], 1.0) 
+         for _, row in data.iterrows()] * \
+        (1 + data['PeakSeason']*0.2)
     
     return data
 
@@ -378,7 +327,7 @@ with st.form("transport_form"):
     
     col1, col2 = st.columns(2)
     with col1:
-        trans_destination = st.selectbox("Destination",DESTINATIONS, key='trans_dest')
+        trans_destination = st.selectbox("Destination", DESTINATIONS, key='trans_dest')
         trans_type = st.selectbox("Transportation Type", TRANSPORT_TYPES, key='trans_type')
     with col2:
         trans_nationality = st.selectbox("Nationality", NATIONALITIES, key='trans_nat')
