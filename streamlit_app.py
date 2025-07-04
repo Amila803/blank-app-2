@@ -303,6 +303,8 @@ if data is not None:
         
         def predict(self, X):
             base_pred = self.model.predict(X)
+
+            return self.model.predict(X)
             
             # Apply constraints
             if isinstance(X, pd.DataFrame):
