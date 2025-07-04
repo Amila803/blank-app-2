@@ -29,7 +29,7 @@ st.markdown("""
 This app predicts travel costs with improved accuracy using advanced machine learning techniques.
 """)
 
-# Enhanced data loading with better error handling
+# Data loading with better error handling
 @st.cache_data
 def load_data():
     try:
@@ -39,7 +39,7 @@ def load_data():
         # Remove empty rows and duplicates
         data = data.dropna(how='all').drop_duplicates()
         
-        # Enhanced currency cleaning
+        # Currency cleaning
         def clean_currency(value):
             if pd.isna(value):
                 return np.nan
@@ -57,7 +57,7 @@ def load_data():
             q_hi = data[cost_col].quantile(0.99)
             data = data[(data[cost_col] >= q_low) & (data[cost_col] <= q_hi)]
         
-        # Enhanced destination cleaning
+        # Destination cleaning
         data['Destination'] = data['Destination'].str.split(',').str[0].str.strip().str.title()
         
         # More robust date conversion
@@ -66,7 +66,7 @@ def load_data():
         data['Duration'] = (data['End date'] - data['Start date']).dt.days
         data = data[data['Duration'] > 0]  # Remove negative durations
         
-        # Enhanced transport type standardization
+        # Transport type standardization
         transport_mapping = {
             'Plane': 'Flight', 'Airplane': 'Flight', 'Aeroplane': 'Flight',
             'Car': 'Car rental', 'Rental Car': 'Car rental', 'Taxi': 'Car rental',
@@ -109,7 +109,7 @@ if data is not None:
     
     options = get_dropdown_options(data)
     
-    # Enhanced Feature Engineering
+    # Feature Engineering
     @st.cache_data
     def engineer_features(df):
         df = df.copy()
@@ -133,8 +133,8 @@ if data is not None:
 
     engineered_data = engineer_features(data)
 
-    # Show enhanced data relationships
-    st.header("Enhanced Data Analysis")
+    # Show data relationships
+    st.header("Data Analysis")
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Cost Distribution")
@@ -149,8 +149,58 @@ if data is not None:
         top_dests.sort_values().plot(kind='barh', ax=ax)
         st.pyplot(fig, use_container_width=True)
 
+        # --- DATA VISUALIZATIONS SECTION ---
+    st.header("📊 Data Visualizations")
+    
+    # 1. Destination vs Cost
+    st.subheader("1. Destination vs Cost")
+    dest_cost = engineered_data.groupby('Destination')['Cost'].mean().sort_values(ascending=False)
+    fig1, ax1 = plt.subplots(figsize=(12, 6))
+    sns.barplot(x=dest_cost.index, y=dest_cost.values, ax=ax1, palette="viridis")
+    plt.xticks(rotation=45, ha='right')
+    plt.title("Average Cost by Destination")
+    plt.ylabel("Average Cost ($)")
+    st.pyplot(fig1)
+    
+    # 2. Duration (Days) vs Cost
+    st.subheader("2. Duration vs Cost")
+    fig2, ax2 = plt.subplots(figsize=(10, 6))
+    sns.regplot(x='Duration', y='Cost', data=engineered_data, 
+                scatter_kws={'alpha':0.3}, line_kws={'color':'red'}, ax=ax2)
+    plt.title("Cost vs Duration of Stay")
+    plt.xlabel("Duration (Days)")
+    plt.ylabel("Cost ($)")
+    st.pyplot(fig2)
+    
+    # 3. Accommodation Type vs Cost
+    st.subheader("3. Accommodation Type vs Cost")
+    acc_cost = engineered_data.groupby('AccommodationType')['Cost'].mean().sort_values(ascending=False)
+    fig3, ax3 = plt.subplots(figsize=(10, 5))
+    sns.barplot(x=acc_cost.index, y=acc_cost.values, ax=ax3, palette="rocket")
+    plt.title("Average Cost by Accommodation Type")
+    plt.ylabel("Average Cost ($)")
+    plt.xticks(rotation=45)
+    st.pyplot(fig3)
+    
+    # 4. Transport Type vs Cost
+    st.subheader("4. Transport Type vs Cost")
+    trans_cost = data.groupby('TransportType')['TransportCost'].mean().sort_values(ascending=False)
+    fig4, ax4 = plt.subplots(figsize=(10, 5))
+    sns.barplot(x=trans_cost.index, y=trans_cost.values, ax=ax4, palette="mako")
+    plt.title("Average Transportation Cost by Type")
+    plt.ylabel("Average Cost ($)")
+    st.pyplot(fig4)
+    
+    # Additional useful visualization
+    st.subheader("Cost Distribution by Season")
+    fig5, ax5 = plt.subplots(figsize=(10, 5))
+    sns.boxplot(x='IsPeakSeason', y='Cost', data=engineered_data, ax=ax5)
+    ax5.set_xticklabels(['Off-Peak', 'Peak Season'])
+    plt.title("Cost Distribution: Peak vs Off-Peak Season")
+    plt.ylabel("Cost ($)")
+    st.pyplot(fig5)
+
     # --- TRANSPORTATION COST PREDICTION ---
-    st.header("🚆 Transportation Cost Prediction")
 
     # Train transportation model
     @st.cache_resource
@@ -163,7 +213,7 @@ if data is not None:
         X = transport_data[['Destination', 'TransportType', 'TravelerNationality', 'PeakSeason', 'HolidaySeason']]
         y = transport_data['TransportCost']
         
-        # Enhanced preprocessing
+        # Preprocessing
         preprocessor = ColumnTransformer(
             transformers=[
                 ('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), 
@@ -194,7 +244,7 @@ if data is not None:
     transport_model = train_transport_model()
 
     # --- ACCOMMODATION COST PREDICTION ---
-    st.header("🏨 Enhanced Accommodation Cost Prediction")
+    st.header("Travel Cost Prediction")
 
     # Prepare features and target
     features = ['Destination', 'Duration', 'AccommodationType', 'TravelerNationality', 
@@ -205,7 +255,7 @@ if data is not None:
     X = engineered_data[features]
     y = engineered_data[target]
 
-    # Enhanced Preprocessing
+    #  Preprocessing
     categorical_features = ['Destination', 'AccommodationType', 'TravelerNationality']
     numeric_features = ['Duration', 'Month', 'IsWeekend', 'IsPeakSeason', 'IsHolidaySeason',
                        'Duration_Peak', 'Duration_Weekend', 'DestinationPopularity']
@@ -219,7 +269,7 @@ if data is not None:
     ('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), categorical_features)
         ])
    
-    # Enhanced model with feature selection
+    #  model with feature selection
     model = Pipeline([
         ('preprocessor', preprocessor),
         ('feature_selection', RFECV(
@@ -238,7 +288,7 @@ if data is not None:
         ))
     ])
 
-    # Enhanced Hyperparameter Tuning
+    #  Hyperparameter Tuning
     param_distributions = {
         'feature_selection__estimator__max_depth': [3, 5, 7, 9],
         'feature_selection__estimator__min_samples_split': [2, 5, 10],
@@ -249,9 +299,9 @@ if data is not None:
         'regressor__colsample_bytree': [0.8, 0.9, 1.0]
     }
 
-    # Train model with enhanced options
-    if st.button("Train Enhanced Model"):
-        with st.spinner("Training enhanced model..."):
+    # Train model with options
+    if st.button("Train Model"):
+        with st.spinner("Training model..."):
             X_train, X_test, y_train, y_test = train_test_split(
                 X, y, test_size=0.2, random_state=42)
             
@@ -277,7 +327,7 @@ if data is not None:
             # Evaluate on test set (reverse log transform)
             y_pred = np.expm1(best_model.predict(X_test))
             
-            # Enhanced evaluation metrics
+            # Evaluation metrics
             mae = mean_absolute_error(y_test, y_pred)
             rmse = np.sqrt(mean_squared_error(y_test, y_pred))
             r2 = r2_score(y_test, y_pred)
@@ -291,7 +341,7 @@ if data is not None:
                 st.metric("MAPE", f"{mape:.2f}%", help="Mean Absolute Percentage Error")
             
             with col2:
-                # Enhanced actual vs predicted plot
+                # Actual vs predicted plot
                 fig, ax = plt.subplots(figsize=(8,6))
                 sns.scatterplot(x=y_test, y=y_pred, alpha=0.5, ax=ax)
                 ax.plot([y.min(), y.max()], [y.min(), y.max()], 'k--', lw=2)
@@ -321,13 +371,13 @@ if data is not None:
                 st.warning(f"Could not plot feature importance: {str(e)}")
 
             # Save model
-            joblib.dump(best_model, 'enhanced_travel_cost_model.pkl')
-            st.success("Enhanced model trained and saved successfully!")
+            joblib.dump(best_model, '_travel_cost_model.pkl')
+            st.success("Mdel trained and saved successfully!")
 
-    # Enhanced Prediction Interface
+    # Prediction Interface
     st.header("💰 Cost Prediction")
 
-    with st.form("enhanced_prediction_form"):
+    with st.form("prediction_form"):
         st.subheader("Calculate Accommodation Costs")
         
         col1, col2 = st.columns(2)
@@ -351,11 +401,11 @@ if data is not None:
             elif destination in options['DESTINATIONS'][-5:]:
                 dest_popularity = 0.3
         
-        submitted = st.form_submit_button("Calculate Enhanced Cost")
+        submitted = st.form_submit_button("Calculate Cost")
 
     if submitted:
         try:
-            model = joblib.load('enhanced_travel_cost_model.pkl')
+            model = joblib.load('travel_cost_model.pkl')
             
             input_data = pd.DataFrame([{
                 'Destination': destination,
@@ -376,7 +426,7 @@ if data is not None:
             st.success(f"## Predicted Cost: ${prediction:,.2f}")
             st.session_state['enh_accom_pred'] = prediction
 
-            # Enhanced cost breakdown
+            # Cost breakdown
             st.subheader("Cost Breakdown")
             base_cost = prediction / duration
             st.write(f"Base daily cost: ${base_cost:,.2f}")
