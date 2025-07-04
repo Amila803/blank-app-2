@@ -221,56 +221,64 @@ if data is not None:
 
     # Train model
     if st.button("Train Model"):
-        with st.spinner("Training model..."):
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-            
-            # Hyperparameter tuning
+    with st.spinner("Training model…"):
+        # 1) split
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42
+        )
 
-            param_distributions = {
-                'regressor__n_estimators':       [100, 200, 300, 400, 500],
-                'regressor__max_depth':          [None, 5, 10, 20, 30],
-                'regressor__min_samples_split':  [2, 5, 10, 15],
-                'regressor__min_samples_leaf':   [1, 2, 4, 6],
-                'regressor__max_features':       ['sqrt', 'log2', None],
-                'regressor__bootstrap':          [True, False]
-            }
-            
-            search = RandomizedSearchCV(
-                estimator=model,
-                param_distributions=param_distributions,
-                n_iter=50,                     # sample 50 different combos
-                cv=5,
-                scoring='neg_mean_absolute_error',  # often better aligned with cost errors
-                n_jobs=-1,
-                random_state=42,
-                verbose=2
-            )
-            search.fit(X_train, y_train)
-            
-            best_model = search.best_estimator_
-            st.write("🔑 Best params:", search.best_params_)
-           
-            
-            # Save model
-            joblib.dump(best_model, 'travel_cost_model.pkl')
-            st.success("Model trained and saved!")
+        # 2) redefine pipeline to use log-transform + LGBM
+        model = Pipeline([
+            ("preprocessor", preprocessor),  # your existing ColumnTransformer
+            ("regressor", TransformedTargetRegressor(
+                regressor=LGBMRegressor(
+                    random_state=42,
+                    n_jobs=-1
+                ),
+                func=np.log1p,
+                inverse_func=np.expm1
+            ))
+        ])
 
-            # Evaluation
-            st.subheader("Model Evaluation")
-            y_pred = best_model.predict(X_test)
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("MAE", f"${mean_absolute_error(y_test, y_pred):.2f}")
-                st.metric("R² Score", f"{r2_score(y_test, y_pred):.2f}")
-            
-            with col2:
-                fig, ax = plt.subplots()
-                ax.scatter(y_test, y_pred, alpha=0.5)
-                ax.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
-                ax.set_xlabel('Actual Cost')
-                ax.set_ylabel('Predicted Cost')
-                st.pyplot(fig)
+        # 3) broader hyperparameter distributions
+        param_dist = {
+            "regressor__regressor__n_estimators":       [200, 500, 800, 1200, 2000],
+            "regressor__regressor__learning_rate":      [0.005, 0.01, 0.03, 0.05, 0.1],
+            "regressor__regressor__num_leaves":         [31, 50, 70, 100, 150],
+            "regressor__regressor__max_depth":          [-1, 5, 10, 20, 30],
+            "regressor__regressor__min_child_samples":  [5, 10, 20, 30, 50],
+            "regressor__regressor__subsample":          [0.6, 0.8, 1.0],
+            "regressor__regressor__colsample_bytree":   [0.6, 0.8, 1.0],
+            "regressor__regressor__reg_alpha":          [0, 0.1, 0.5, 1.0],
+            "regressor__regressor__reg_lambda":         [0, 0.1, 0.5, 1.0],
+        }
+
+        # 4) use repeated CV for stability
+        cv = RepeatedKFold(n_splits=5, n_repeats=3, random_state=42)
+
+        search = RandomizedSearchCV(
+            estimator=model,
+            param_distributions=param_dist,
+            n_iter=80,               # try 80 random combos
+            cv=cv,
+            scoring="r2",            # directly optimize R²
+            n_jobs=-1,
+            random_state=42,
+            verbose=1
+        )
+        search.fit(X_train, y_train)
+
+        # 5) report best params & metrics
+        best_model = search.best_estimator_
+        y_pred = best_model.predict(X_test)
+
+        st.write("🔑 Best hyperparameters:", search.best_params_)
+        st.metric("R² (test)", f"{r2_score(y_test, y_pred):.3f}")
+        st.metric("MAE (test)", f"${mean_absolute_error(y_test, y_pred):.2f}")
+
+        # 6) persist your model
+        joblib.dump(best_model, "travel_cost_model.pkl")
+        st.success("Model trained, evaluated, and saved!")
 
     # Prediction Interface
     st.header("Cost Prediction")
