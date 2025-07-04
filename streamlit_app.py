@@ -209,7 +209,6 @@ def train_transport_model():
 transport_model = train_transport_model()
 
 
----------------------------------------------------------------------------------------------------------------------------------------
 
 
 ### MODEL TRAINING
@@ -276,7 +275,6 @@ if st.button("Train Model"):
             ax.set_ylabel('Predicted Cost')
             st.pyplot(fig)
 
----------------------------------------------------------------------------------------------------------------------------------------
 # Prediction Interface
 st.header("Cost Prediction")
 
