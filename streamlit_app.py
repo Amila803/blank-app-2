@@ -1,3 +1,4 @@
+this has eerrors:
 
 import streamlit as st
 import pandas as pd
@@ -15,7 +16,9 @@ from datetime import datetime
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.compose import TransformedTargetRegressor
 from lightgbm import LGBMRegressor
-
+from sklearn.ensemble import StackingRegressor
+from sklearn.linear_model import LinearRegression
+from xgboost import XGBRegressor
 
 
 # Set page config
@@ -112,6 +115,22 @@ if data is not None:
         df['DayOfWeek'] = df['StartDate'].dt.dayofweek  # Monday=0, Sunday=6
         df['IsWeekend'] = df['DayOfWeek'].isin([5,6]).astype(int)
         df['IsPeakSeason'] = df['Month'].isin([6,7,8,12]).astype(int)
+
+        df['IsSummer'] = df['Month'].isin([6,7,8]).astype(int)
+        df['IsWinter'] = df['Month'].isin([12,1,2]).astype(int)
+        df['IsSpring'] = df['Month'].isin([3,4,5]).astype(int)
+        df['IsFall'] = df['Month'].isin([9,10,11]).astype(int)
+
+
+
+            # Duration features
+        df['DurationSquared'] = df['Duration'] ** 2
+        df['LogDuration'] = np.log1p(df['Duration'])
+        
+        # Destination popularity (proxy for demand)
+        dest_counts = df['Destination'].value_counts(normalize=True)
+        df['DestinationPopularity'] = df['Destination'].map(dest_counts)
+    
         return df
 
     engineered_data = engineer_features(data)
@@ -140,10 +159,11 @@ if data is not None:
     def train_transport_model():
         # Feature engineering
         transport_data = data[['Destination', 'TransportType', 'TravelerNationality', 'TransportCost']].copy()
-        transport_data['PeakSeason'] = pd.to_datetime(data['StartDate']).dt.month.isin([6,7,8,12]).astype(int)
+        transport_data = engineer_features(transport_data)
         
-        X = transport_data[['Destination', 'TransportType', 'TravelerNationality', 'PeakSeason']]
+        X = transport_data.drop('TransportCost', axis=1)
         y = transport_data['TransportCost']
+
         
         # Preprocessing
         preprocessor = ColumnTransformer(
@@ -199,7 +219,8 @@ if data is not None:
 
     # Prepare features and target
     features = ['Destination', 'Duration', 'AccommodationType', 'TravelerNationality', 
-                'Month', 'IsWeekend', 'IsPeakSeason']
+                'Month', 'IsWeekend', 'IsPeakSeason', 'IsSummer', 'IsWinter',
+                'DurationSquared', 'DestinationPopularity']
     target = 'Cost'
 
     X = engineered_data[features]
@@ -207,11 +228,12 @@ if data is not None:
 
     # Preprocessing
     categorical_features = ['Destination', 'AccommodationType', 'TravelerNationality']
-    numeric_features = ['Duration', 'Month', 'IsWeekend', 'IsPeakSeason']
+    numeric_features = [col for col in features if col not in categorical_features + [target]]
+    
     preprocessor = ColumnTransformer([
         ('num', StandardScaler(), numeric_features),
-        ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features),
-    ])
+        ('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), categorical_features)
+
 
     # Model pipeline
     model = Pipeline(steps=[
@@ -224,32 +246,49 @@ if data is not None:
         with st.spinner("Training model..."):
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             
-            # Hyperparameter tuning
-
-            param_distributions = {
-                'regressor__n_estimators':       [100, 200, 300, 400, 500],
-                'regressor__max_depth':          [None, 5, 10, 20, 30],
-                'regressor__min_samples_split':  [2, 5, 10, 15],
-                'regressor__min_samples_leaf':   [1, 2, 4, 6],
-                'regressor__max_features':       ['sqrt', 'log2', None],
-                'regressor__bootstrap':          [True, False]
+            # Stacking Ensemble
+            base_models = [
+                ('lgbm', LGBMRegressor(random_state=42)),
+                ('xgb', XGBRegressor(random_state=42)),
+                ('rf', RandomForestRegressor(random_state=42))
+            ]
+            
+            model = Pipeline([
+                ('preprocessor', preprocessor),
+                ('stacking', StackingRegressor(
+                    estimators=base_models,
+                    final_estimator=LinearRegression(),
+                    cv=5,
+                    n_jobs=-1
+                ))
+            ])
+            
+            # Parameter grid for Stacking approach
+            param_grid = {
+                'stacking__lgbm__n_estimators': [100, 200, 300],
+                'stacking__lgbm__learning_rate': [0.01, 0.05, 0.1],
+                'stacking__lgbm__max_depth': [3, 5, 7],
+                'stacking__xgb__n_estimators': [100, 200],
+                'stacking__xgb__max_depth': [3, 5],
+                'stacking__rf__n_estimators': [100, 200],
+                'stacking__rf__max_depth': [5, 10]
             }
             
             search = RandomizedSearchCV(
-                estimator=model,
-                param_distributions=param_distributions,
-                n_iter=50,                     # sample 50 different combos
+                model,
+                param_grid,
+                n_iter=50,
                 cv=5,
-                scoring='neg_mean_absolute_error',  # often better aligned with cost errors
+                scoring='neg_mean_absolute_error',
                 n_jobs=-1,
                 random_state=42,
                 verbose=2
             )
+            
             search.fit(X_train, y_train)
             
             best_model = search.best_estimator_
             st.write("🔑 Best params:", search.best_params_)
-           
             
             # Save model
             joblib.dump(best_model, 'travel_cost_model.pkl')
@@ -271,7 +310,7 @@ if data is not None:
                 ax.set_xlabel('Actual Cost')
                 ax.set_ylabel('Predicted Cost')
                 st.pyplot(fig)
-
+            
     # Prediction Interface
     st.header("Cost Prediction")
 
