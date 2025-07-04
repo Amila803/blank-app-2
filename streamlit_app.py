@@ -262,8 +262,8 @@ if data is not None:
             is_peak_season = 1 if month in [6,7,8,12] else 0
         
         submitted = st.form_submit_button("Calculate Accommodation Cost")
-
-       if submitted:
+        
+        if submitted:
            try:
             model = joblib.load('travel_cost_model.pkl')
             
@@ -306,8 +306,7 @@ if data is not None:
                 st.write("⚠️ Weekend surcharge applied")
                 
             st.session_state['accom_pred'] = total_cost
-            
-        except Exception as e:
+           except Exception as e:
             st.error(f"Prediction failed: {str(e)}")
 
     # Transport Prediction interface
