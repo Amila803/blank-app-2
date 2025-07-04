@@ -271,7 +271,7 @@ if data is not None:
             'stacking__rf__max_depth': [5, 10]
         }
 
-         search.fit(X_train, y_train)
+        search.fit(X_train, y_train)
         
         best_model = search.best_estimator_
         st.write("🔑 Best params:", search.best_params_)
