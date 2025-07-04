@@ -49,6 +49,22 @@ def load_data():
         (1 + 0.2 * data['StartDate'].dt.month.isin([6,7,8,12])) *  # Peak season markup
         (1 + 0.1 * data['StartDate'].dt.dayofweek.isin([4,5])))  # Weekend markup
 
+    accommodation_factors = {
+    'Hostel': 0.2,    # cheapest
+    'Hotel': 1.0,     # mid-range
+    'Airbnb': 0.8,    # slightly below hotel
+    'Resort': 1.5     # priciest
+    }
+
+    data['AccomFactor'] = data['AccommodationType'].map(accommodation_factors)
+    data['Cost'] = (
+    data['Destination'].map(base_costs)
+    * data['Duration']
+    * (1 + 0.2 * data['StartDate'].dt.month.isin([6,7,8,12]))
+    * (1 + 0.1 * data['StartDate'].dt.dayofweek.isin([4,5]))
+    * data['AccomFactor']
+    )
+    
     # Add some noise
     data['Cost'] = data['Cost'] * np.random.normal(1, 0.1, n_samples)
     return data.round(2)
@@ -72,8 +88,7 @@ engineered_data = engineer_features(data)
 
 # Show data relationships
 st.header("Data Relationships")
-col1, col2, col3 = st.columns(3)
-
+col1, col2 = st.columns(2)
 with col1:
     st.subheader("Cost vs Duration")
     fig, ax = plt.subplots()
@@ -85,17 +100,6 @@ with col2:
     monthly_avg = engineered_data.groupby('Month')['Cost'].mean()
     fig, ax = plt.subplots()
     monthly_avg.plot(kind='bar', ax=ax)
-    ax.set_ylabel("Average Cost")
-    st.pyplot(fig)
-
-with col3:
-    st.subheader("Average Cost by Accommodation")
-    accom_avg = engineered_data.groupby('AccommodationType')['Cost']\
-                 .mean().sort_values()
-    fig, ax = plt.subplots()
-    accom_avg.plot(kind='bar', ax=ax)
-    ax.set_ylabel("Average Cost")
-    plt.xticks(rotation=45)
     st.pyplot(fig)
 
 # --- TRANSPORTATION COST PREDICTION ---
@@ -104,23 +108,8 @@ st.header("🚆 Transportation Cost Prediction")
 
 # Transportation type options
 TRANSPORT_TYPES = ['Flight', 'Train', 'Bus', 'Car rental']
-NATIONALITIES = sorted(list(set([
-    'American', 'Canadian', 'Korean', 'British', 'Vietnamese', 'Australian',
-    'Brazilian', 'Dutch', 'Emirati', 'Mexican', 'Spanish', 'Chinese',
-    'German', 'Moroccan', 'Scottish', 'Indian', 'Italian', 'South Korean',
-    'Taiwanese', 'South African', 'French', 'Japanese', 'Cambodia', 'Greece',
-    'United Arab Emirates', 'Hong Kong', 'Singapore', 'Indonesia', 'USA',
-    'UK', 'China', 'New Zealander'
-])))
-
-DESTINATIONS = [
-    'London', 'Phuket', 'Bali', 'New York', 'Tokyo', 'Paris', 'Sydney',
-    'Rio de Janeiro', 'Amsterdam', 'Dubai', 'Cancun', 'Barcelona',
-    'Honolulu', 'Berlin', 'Marrakech', 'Edinburgh', 'Rome', 'Bangkok',
-    'Cape Town', 'Vancouver', 'Seoul', 'Los Angeles', 'Santorini',
-    'Phnom Penh', 'Athens', 'Auckland'
-]
-
+NATIONALITIES = ['American', 'British', 'Canadian', 'Australian', 'Japanese']
+DESTINATIONS = ['London', 'Paris', 'Tokyo', 'New York', 'Bali']
 
 # Load/generate transportation data
 @st.cache_data
@@ -129,34 +118,12 @@ def load_transport_data():
     n_samples = 500
     
     # Base costs by destination and transport type
-    # Base costs by destination and transport type
     transport_costs = {
         'London': {'Flight': 400, 'Train': 150, 'Bus': 80, 'Car rental': 200},
         'Paris': {'Flight': 350, 'Train': 120, 'Bus': 60, 'Car rental': 180},
         'Tokyo': {'Flight': 800, 'Train': 250, 'Bus': 100, 'Car rental': 300},
         'New York': {'Flight': 500, 'Train': 100, 'Bus': 70, 'Car rental': 250},
-        'Bali': {'Flight': 700, 'Train': 50, 'Bus': 30, 'Car rental': 150},
-        'Phuket': {'Flight': 650, 'Train': 40, 'Bus': 35, 'Car rental': 120},
-        'Sydney': {'Flight': 750, 'Train': 180, 'Bus': 90, 'Car rental': 220},
-        'Rio de Janeiro': {'Flight': 600, 'Train': 90, 'Bus': 50, 'Car rental': 170},
-        'Amsterdam': {'Flight': 380, 'Train': 130, 'Bus': 65, 'Car rental': 190},
-        'Dubai': {'Flight': 450, 'Train': 60, 'Bus': 40, 'Car rental': 160},
-        'Cancun': {'Flight': 550, 'Train': 70, 'Bus': 45, 'Car rental': 140},
-        'Barcelona': {'Flight': 370, 'Train': 110, 'Bus': 55, 'Car rental': 175},
-        'Honolulu': {'Flight': 720, 'Train': 30, 'Bus': 60, 'Car rental': 210},
-        'Berlin': {'Flight': 390, 'Train': 140, 'Bus': 70, 'Car rental': 185},
-        'Marrakech': {'Flight': 420, 'Train': 80, 'Bus': 40, 'Car rental': 130},
-        'Edinburgh': {'Flight': 410, 'Train': 120, 'Bus': 60, 'Car rental': 180},
-        'Rome': {'Flight': 360, 'Train': 100, 'Bus': 50, 'Car rental': 170},
-        'Bangkok': {'Flight': 680, 'Train': 45, 'Bus': 30, 'Car rental': 110},
-        'Cape Town': {'Flight': 730, 'Train': 85, 'Bus': 55, 'Car rental': 160},
-        'Vancouver': {'Flight': 480, 'Train': 95, 'Bus': 65, 'Car rental': 195},
-        'Seoul': {'Flight': 780, 'Train': 220, 'Bus': 95, 'Car rental': 280},
-        'Los Angeles': {'Flight': 520, 'Train': 110, 'Bus': 75, 'Car rental': 230},
-        'Santorini': {'Flight': 430, 'Train': 60, 'Bus': 35, 'Car rental': 125},
-        'Phnom Penh': {'Flight': 670, 'Train': 35, 'Bus': 25, 'Car rental': 100},
-        'Athens': {'Flight': 440, 'Train': 90, 'Bus': 50, 'Car rental': 155},
-        'Auckland': {'Flight': 760, 'Train': 75, 'Bus': 80, 'Car rental': 200}
+        'Bali': {'Flight': 700, 'Train': 50, 'Bus': 30, 'Car rental': 150}
     }
     
     # Nationality preferences (multipliers)
@@ -165,34 +132,7 @@ def load_transport_data():
         'British': {'Train': 1.3, 'Flight': 1.1},
         'Canadian': {'Flight': 1.1, 'Car rental': 1.1},
         'Japanese': {'Train': 1.4, 'Bus': 1.2},
-        'Australian': {'Flight': 1.2, 'Car rental': 0.9},
-        'Korean': {'Flight': 1.1, 'Train': 1.3},
-        'Vietnamese': {'Bus': 1.3, 'Flight': 0.9},
-        'Brazilian': {'Flight': 1.0, 'Bus': 1.1},
-        'Dutch': {'Bike': 1.5, 'Train': 1.2},  # Assuming bike is an option for Dutch
-        'Emirati': {'Flight': 1.3, 'Car rental': 1.4},
-        'Mexican': {'Bus': 1.2, 'Car rental': 1.1},
-        'Spanish': {'Train': 1.2, 'Bus': 1.1},
-        'Chinese': {'Flight': 1.1, 'Train': 1.3},
-        'German': {'Train': 1.4, 'Car rental': 1.1},
-        'Moroccan': {'Bus': 1.3, 'Train': 1.1},
-        'Scottish': {'Train': 1.2, 'Car rental': 1.0},
-        'Indian': {'Train': 1.5, 'Flight': 1.0},
-        'Italian': {'Train': 1.3, 'Car rental': 1.2},
-        'South Korean': {'Flight': 1.2, 'Train': 1.4},
-        'Taiwanese': {'Flight': 1.1, 'Bus': 1.2},
-        'South African': {'Flight': 1.0, 'Car rental': 1.1},
-        'French': {'Train': 1.5, 'Flight': 1.0},
-        'Cambodian': {'Bus': 1.4, 'Flight': 0.8},
-        'Greek': {'Bus': 1.2, 'Car rental': 1.0},
-        'United Arab Emirates': {'Flight': 1.4, 'Car rental': 1.5},
-        'Hong Kong': {'Flight': 1.2, 'Train': 1.1},
-        'Singapore': {'Flight': 1.3, 'Train': 1.2},
-        'Indonesian': {'Bus': 1.3, 'Flight': 0.9},
-        'USA': {'Flight': 1.0, 'Car rental': 1.2},  # Same as American
-        'UK': {'Train': 1.3, 'Flight': 1.1},  # Same as British
-        'China': {'Flight': 1.1, 'Train': 1.3},  # Same as Chinese
-        'New Zealander': {'Flight': 1.2, 'Car rental': 0.8}
+        'Australian': {'Flight': 1.2, 'Car rental': 0.9}
     }
     
     data = pd.DataFrame({
@@ -275,10 +215,9 @@ y = engineered_data[target]
 categorical_features = ['Destination', 'AccommodationType', 'TravelerNationality']
 numeric_features     = ['Duration', 'Month', 'IsWeekend', 'IsPeakSeason']
 preprocessor = ColumnTransformer([
-    ('num', StandardScaler(),       ['Duration','Month','IsWeekend','IsPeakSeason']),
-    ('cat', OneHotEncoder(),        ['Destination','AccommodationType','TravelerNationality'])
+    ('num', StandardScaler(),        numeric_features),
+    ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features),
 ])
-
 
 
 # Model pipeline
@@ -324,6 +263,7 @@ if st.button("Train Model"):
             ax.set_xlabel('Actual Cost')
             ax.set_ylabel('Predicted Cost')
             st.pyplot(fig)
+
 
 # Prediction Interface
 st.header("Cost Prediction")
