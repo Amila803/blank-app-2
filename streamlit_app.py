@@ -109,18 +109,18 @@ if data is not None:
     # Feature Engineering
 
     class FeatureEngineer(BaseEstimator, TransformerMixin):
-    def __init__(self):
-        # now you’re inside a method, so `self` is valid
-        self.holidays_de = holidays.DE()
+        def __init__(self):
+            
+            self.holidays_de = holidays.DE()
 
-    def fit(self, X, y=None):
-        # no fitting to do, just return self
-        return self
-
-    def transform(self, X):
-        # your transformation logic goes here
-        # e.g. X['is_holiday'] = X['date'].apply(lambda d: d in self.holidays_de)
-        return X
+        def fit(self, X, y=None):
+            # no fitting to do, just return self
+            return self
+    
+        def transform(self, X):
+            # your transformation logic goes here
+            # e.g. X['is_holiday'] = X['date'].apply(lambda d: d in self.holidays_de)
+            return X
         
         # Date features (only if StartDate exists)
         if 'StartDate' in X.columns:
