@@ -316,7 +316,7 @@ if data is not None:
                 if 'Duration' in X.columns:
                     base_pred = base_pred * (1 + (X['Duration'] - X['Duration'].mean()) * self.duration_multiplier)
             
-        return base_pred
+            return base_pred
     
     # Train model
     if st.button("Train Model"):
