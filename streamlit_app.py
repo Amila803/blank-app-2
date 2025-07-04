@@ -157,24 +157,27 @@ if data is not None:
     NATIONALITIES = sorted(data['TravelerNationality'].dropna().unique().tolist())
     TRANSPORT_TYPES = sorted(data['TransportType'].dropna().unique().tolist())
    
-    # Month vs Cost Visualization
-    st.subheader("Monthly Accommodation Cost Distribution")
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.boxplot(data=engineered_data, x='Month', y='Cost', ax=ax)
-    ax.set_title('Monthly Distribution of Accommodation Costs')
-    ax.set_xlabel('Month')
-    ax.set_ylabel('Accommodation Cost (USD)')
-    st.pyplot(fig)
+    st.subheader("Cost Analysis")
+    col1, col2 = st.columns(2)
     
-    # Transport Type vs Cost Visualization
-    st.subheader("Transportation Type vs Cost")
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.boxplot(data=engineered_data, x='TransportType', y='TransportCost', ax=ax)
-    ax.set_title('Transportation Cost by Transport Type')
-    ax.set_xlabel('Type of Transport')
-    ax.set_ylabel('Transportation Cost (USD)')
-    plt.xticks(rotation=45)
-    st.pyplot(fig)
+    with col1:
+        st.write("Monthly Accommodation Cost")
+        fig, ax = plt.subplots(figsize=(6, 4))
+        sns.boxplot(data=engineered_data, x='Month', y='Cost', ax=ax)
+        ax.set_title('Accommodation Costs by Month')
+        ax.set_xlabel('Month')
+        ax.set_ylabel('Cost (USD)')
+        st.pyplot(fig)
+    
+    with col2:
+        st.write("Transportation Type vs Cost")
+        fig, ax = plt.subplots(figsize=(6, 4))
+        sns.boxplot(data=engineered_data, x='TransportType', y='TransportCost', ax=ax)
+        ax.set_title('Cost by Transport Type')
+        ax.set_xlabel('Transport Type')
+        ax.set_ylabel('Cost (USD)')
+        plt.xticks(rotation=45)
+        st.pyplot(fig)
         
     # Model training
     st.header("Model Training")
