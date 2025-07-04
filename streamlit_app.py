@@ -4,17 +4,20 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import holidays
+import joblib
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-import joblib
 from datetime import datetime
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.compose import TransformedTargetRegressor
 from lightgbm import LGBMRegressor
+from sklearn.base import BaseEstimator, TransformerMixin
+
 
 
 
@@ -106,17 +109,18 @@ if data is not None:
     # Feature Engineering
 
     class FeatureEngineer(BaseEstimator, TransformerMixin):
-        def __init__(self):
-            self.holidays_us = holidays.US()
-            self.holidays_uk = holidays.UK()
-            self.holidays_jp = holidays.JP()
-            self.holidays_de = holidays.DE()
-        
+    def __init__(self):
+        # now you’re inside a method, so `self` is valid
+        self.holidays_de = holidays.DE()
+
     def fit(self, X, y=None):
+        # no fitting to do, just return self
         return self
-    
+
     def transform(self, X):
-        X = X.copy()
+        # your transformation logic goes here
+        # e.g. X['is_holiday'] = X['date'].apply(lambda d: d in self.holidays_de)
+        return X
         
         # Date features (only if StartDate exists)
         if 'StartDate' in X.columns:
