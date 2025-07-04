@@ -256,51 +256,52 @@ if data is not None:
             is_peak_season = 1 if month in [6,7,8,12] else 0
         
         submitted = st.form_submit_button("Calculate Accommodation Cost")
-if submitted:
-    try:
-        model = joblib.load('travel_cost_model.pkl')
+        # Prediction Interface
+    if submitted:
+        try:
+            model = joblib.load('travel_cost_model.pkl')
+            
+            # Predict for 1 day first to get base rate
+            input_data_1day = pd.DataFrame([{
+                'Destination': destination,
+                'Duration': 1,  # Predict for 1 day
+                'AccommodationType': accommodation,
+                'TravelerNationality': nationality,
+                'Month': month,
+                'IsWeekend': is_weekend,
+                'IsPeakSeason': is_peak_season
+            }])
+            
+            base_cost = model.predict(input_data_1day)[0]
+            
+            # Now predict for actual duration
+            input_data = pd.DataFrame([{
+                'Destination': destination,
+                'Duration': duration,
+                'AccommodationType': accommodation,
+                'TravelerNationality': nationality,
+                'Month': month,
+                'IsWeekend': is_weekend,
+                'IsPeakSeason': is_peak_season
+            }])
+            
+            prediction = model.predict(input_data)[0]
+            
+            st.success(f"## Predicted Cost: ${prediction:,.2f}")
+            st.session_state['accom_pred'] = prediction
+    
+            # Show cost breakdown
+            st.subheader("Cost Breakdown")
+            st.write(f"Base daily cost: ${base_cost:,.2f}")
+            st.write(f"Total for {duration} days: ${prediction:,.2f}")
+            
+            # Calculate and show any discounts for longer stays
+            if duration > 1:
+                avg_daily = prediction / duration
+                discount = ((base_cost - avg_daily) / base_cost) * 100
+                if discount > 0:
+                    st.write(f"✨ Average daily rate: ${avg_daily:,.2f} ({discount:.1f}% discount for longer stay)")
         
-        # Predict for 1 day first to get base rate
-        input_data_1day = pd.DataFrame([{
-            'Destination': destination,
-            'Duration': 1,  # Predict for 1 day
-            'AccommodationType': accommodation,
-            'TravelerNationality': nationality,
-            'Month': month,
-            'IsWeekend': is_weekend,
-            'IsPeakSeason': is_peak_season
-        }])
-        
-        base_cost = model.predict(input_data_1day)[0]
-        
-        # Now predict for actual duration
-        input_data = pd.DataFrame([{
-            'Destination': destination,
-            'Duration': duration,
-            'AccommodationType': accommodation,
-            'TravelerNationality': nationality,
-            'Month': month,
-            'IsWeekend': is_weekend,
-            'IsPeakSeason': is_peak_season
-        }])
-        
-        prediction = model.predict(input_data)[0]
-        
-        st.success(f"## Predicted Cost: ${prediction:,.2f}")
-        st.session_state['accom_pred'] = prediction
-
-        # Show cost breakdown
-        st.subheader("Cost Breakdown")
-        st.write(f"Base daily cost: ${base_cost:,.2f}")
-        st.write(f"Total for {duration} days: ${prediction:,.2f}")
-        
-        # Calculate and show any discounts for longer stays
-        if duration > 1:
-            avg_daily = prediction / duration
-            discount = ((base_cost - avg_daily) / base_cost) * 100
-            if discount > 0:
-                st.write(f"✨ Average daily rate: ${avg_daily:,.2f} ({discount:.1f}% discount for longer stay)")
-                
         except Exception as e:
             st.error(f"Prediction failed: {str(e)}")
 
