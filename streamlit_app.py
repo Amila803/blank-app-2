@@ -25,6 +25,14 @@ This app predicts travel costs based on actual travel data.
 @st.cache_data
 def load_data():
     try:
+        try:
+            with open("Travel_details_dataset.csv", 'r') as f:
+                pass
+        except FileNotFoundError:
+            st.error("Error: 'Travel_details_dataset.csv' not found in directory.")
+            st.info(f"Current directory: {os.getcwd()}")
+            return None
+        
         # Load the dataset with proper encoding
         data = pd.read_csv("Travel_details_dataset.csv", encoding='utf-8-sig')
         
