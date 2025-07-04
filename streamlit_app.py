@@ -24,7 +24,6 @@ This app predicts travel costs with improved date and duration relationships.
 # Load or generate sample data
 @st.cache_data
 def load_data():
-    # This is sample data - replace with your actual data
     # Generating synthetic data with clear relationships
     np.random.seed(42)
     n_samples = 1000
@@ -72,7 +71,7 @@ def load_data():
 data = load_data()
 
 
-# Feature Engineering
+### FEATURE ENGINEERING
 
 def engineer_features(df):
     df = df.copy()
@@ -107,10 +106,22 @@ st.header("🚆 Transportation Cost Prediction")
 
 
 # Transportation type options
-TRANSPORT_TYPES = ['Flight', 'Train', 'Bus', 'Car rental']
-NATIONALITIES = ['American', 'British', 'Canadian', 'Australian', 'Japanese']
-DESTINATIONS = ['London', 'Paris', 'Tokyo', 'New York', 'Bali']
-
+TRANSPORT_TYPES = ['Flight', 'Train', 'Bus', 'Car rental', 'Ferry', 'Bike rental', 'Rideshare']
+NATIONALITIES = [
+    'American', 'British', 'Canadian', 'Australian', 'Japanese',
+    'Chinese', 'German', 'French', 'Italian', 'Spanish',
+    'Brazilian', 'Indian', 'Russian', 'South Korean', 'Mexican',
+    'Dutch', 'Swedish', 'Norwegian', 'Swiss', 'Singaporean',
+    'Thai', 'Vietnamese', 'Indonesian', 'Malaysian', 'Emirati'
+]
+DESTINATIONS = [
+    'London', 'Paris', 'Tokyo', 'New York', 'Bali',
+    'Sydney', 'Rome', 'Berlin', 'Barcelona', 'Dubai',
+    'Singapore', 'Hong Kong', 'Bangkok', 'Seoul', 'Istanbul',
+    'Cape Town', 'Rio de Janeiro', 'Toronto', 'Los Angeles', 'Mumbai',
+    'Amsterdam', 'Vienna', 'Prague', 'Athens', 'Cairo',
+    'Reykjavik', 'Hawaii', 'Santorini', 'Phuket', 'Marrakech'
+]
 # Load/generate transportation data
 @st.cache_data
 def load_transport_data():
@@ -198,9 +209,10 @@ def train_transport_model():
 transport_model = train_transport_model()
 
 
+---------------------------------------------------------------------------------------------------------------------------------------
 
 
-# Model Training
+### MODEL TRAINING
 st.header("Model Training")
 
 # Prepare features and target
@@ -264,7 +276,7 @@ if st.button("Train Model"):
             ax.set_ylabel('Predicted Cost')
             st.pyplot(fig)
 
-
+---------------------------------------------------------------------------------------------------------------------------------------
 # Prediction Interface
 st.header("Cost Prediction")
 
