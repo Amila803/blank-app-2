@@ -125,8 +125,8 @@ if data is not None:
             df[f'Is{season_names[i]}'] = df['Month'].isin(months).astype(int)
         
         # Holiday periods
-        df['IsHoliday'] = ((df['Month'] == 12) & (df['DayOfMonth'].between(15, 31)) | \
-                          ((df['Month'] == 1) & (df['DayOfMonth'].between(1, 7))
+        df['IsHoliday'] = ((df['Month'] == 12) & (df['DayOfMonth'].between(15, 31))) | \
+                          ((df['Month'] == 1) & (df['DayOfMonth'].between(1, 7)))
         
         # Duration features
         df['LogDuration'] = np.log1p(df['Duration'])
