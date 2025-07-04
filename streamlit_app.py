@@ -174,7 +174,7 @@ if data is not None:
         st.pyplot(fig)
 
     # --- ACCOMMODATION COST PREDICTION ---
-    st.header("🏨 Accommodation Cost Prediction")
+    st.header("Cost Prediction")
 
     # Prepare features and target
     features = ['Destination', 'Duration', 'AccommodationType', 'TravelerNationality', 
@@ -239,7 +239,7 @@ if data is not None:
     st.header("Cost Prediction")
 
     with st.form("prediction_form"):
-        st.subheader("Enter Trip Details")
+        st.subheader("Calculate Accommodation Costs")
         
         col1, col2 = st.columns(2)
         with col1:
