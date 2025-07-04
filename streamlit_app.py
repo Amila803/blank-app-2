@@ -195,7 +195,7 @@ nationality_factors = {
     'New Zealander': {'Flight': 1.2, 'Car rental': 0.8}
 }
     
-    data = pd.DataFrame({
+data = pd.DataFrame({
         'Destination': np.random.choice(DESTINATIONS, n_samples),
         'TransportType': np.random.choice(TRANSPORT_TYPES, n_samples),
         'Nationality': np.random.choice(NATIONALITIES, n_samples),
