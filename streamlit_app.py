@@ -13,6 +13,9 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import joblib
 from datetime import datetime
 from sklearn.model_selection import RandomizedSearchCV
+from sklearn.compose import TransformedTargetRegressor
+from lightgbm import LGBMRegressor
+
 
 
 # Set page config
@@ -148,9 +151,25 @@ if data is not None:
                 ('cat', OneHotEncoder(handle_unknown='ignore'), ['Destination', 'TransportType', 'TravelerNationality'])
             ])
         
+        base = RandomForestRegressor(random_state=42, n_jobs=-1)
         model = Pipeline([
             ('preprocessor', preprocessor),
-            ('regressor', RandomForestRegressor(random_state=42))
+            ('regressor', TransformedTargetRegressor(
+                regressor=base,
+                func=np.log1p,
+                inverse_func=np.expm1
+            ))
+        ])
+
+        model = Pipeline([
+          ('preprocessor', preprocessor),
+          ('regressor', LGBMRegressor(
+              n_estimators=500,
+              learning_rate=0.05,
+              max_depth=10,
+              random_state=42,
+              n_jobs=-1
+          ))
         ])
         
         model.fit(X, y)
