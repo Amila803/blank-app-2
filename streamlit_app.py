@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -121,8 +120,8 @@ if data is not None:
         df['NationalityAvgCost'] = df['TravelerNationality'].map(nationality_avg_cost)
         df['PeakDuration'] = df['Duration'] * df['IsPeakSeason']
         df['WeekendDuration'] = df['Duration'] * df['IsWeekend']
-    
-    return df
+        
+        return df
 
     engineered_data = engineer_features(data)
 
@@ -252,39 +251,6 @@ if data is not None:
 
     # Prediction Interface
     st.header("Cost Prediction")
-    if submitted:
-        try:
-        model = joblib.load('travel_cost_model.pkl')
-        
-        # Calculate necessary statistics from your data
-        destination_popularity = data['Destination'].value_counts(normalize=True).to_dict()
-        nationality_avg_cost = data.groupby('TravelerNationality')['Cost'].mean().to_dict()
-        
-        # Create input data with all required features
-        input_data = pd.DataFrame([{
-            'Destination': destination,
-            'Duration': duration,
-            'AccommodationType': accommodation,
-            'TravelerNationality': nationality,
-            'Month': month,
-            'IsWeekend': is_weekend,  # Fixed typo from 'IsWeekend' to match your model
-            'IsPeakSeason': is_peak_season,
-            'DurationSquared': duration ** 2,
-            'LogDuration': np.log1p(duration),
-            'DestinationPopularity': destination_popularity.get(destination, 0.5),
-            'NationalityAvgCost': nationality_avg_cost.get(nationality, data['Cost'].mean()),
-            'PeakDuration': duration * is_peak_season,
-            'WeekendDuration': duration * is_weekend
-        }])
-        
-        prediction = model.predict(input_data)[0]
-        st.success(f"## Predicted Cost: ${prediction:,.2f}")
-        st.session_state['accom_pred'] = prediction
-
-    except Exception as e:
-        st.error(f"Prediction failed: {str(e)}")
- 
-
     
     with st.form("prediction_form"):
         st.subheader("Enter Trip Details")
@@ -304,8 +270,38 @@ if data is not None:
             is_peak_season = 1 if month in [6,7,8,12] else 0
         
         submitted = st.form_submit_button("Calculate Accommodation Cost")
-        # Prediction Interface
     
+    if submitted:
+        try:
+            model = joblib.load('travel_cost_model.pkl')
+            
+            # Calculate necessary statistics from your data
+            destination_popularity = data['Destination'].value_counts(normalize=True).to_dict()
+            nationality_avg_cost = data.groupby('TravelerNationality')['Cost'].mean().to_dict()
+            
+            # Create input data with all required features
+            input_data = pd.DataFrame([{
+                'Destination': destination,
+                'Duration': duration,
+                'AccommodationType': accommodation,
+                'TravelerNationality': nationality,
+                'Month': month,
+                'IsWeekend': is_weekend,
+                'IsPeakSeason': is_peak_season,
+                'DurationSquared': duration ** 2,
+                'LogDuration': np.log1p(duration),
+                'DestinationPopularity': destination_popularity.get(destination, 0.5),
+                'NationalityAvgCost': nationality_avg_cost.get(nationality, data['Cost'].mean()),
+                'PeakDuration': duration * is_peak_season,
+                'WeekendDuration': duration * is_weekend
+            }])
+            
+            prediction = model.predict(input_data)[0]
+            st.success(f"## Predicted Cost: ${prediction:,.2f}")
+            st.session_state['accom_pred'] = prediction
+
+        except Exception as e:
+            st.error(f"Prediction failed: {str(e)}")
 
     # Transport Prediction interface
     with st.form("transport_form"):
@@ -319,9 +315,9 @@ if data is not None:
             trans_nationality = st.selectbox("Nationality", NATIONALITIES, key='trans_nat')
             is_peak = st.checkbox("Peak Season Travel", value=False)
         
-        submitted = st.form_submit_button("Calculate Transport Cost")
+        trans_submitted = st.form_submit_button("Calculate Transport Cost")
 
-    if submitted:
+    if trans_submitted:
         input_data = pd.DataFrame([{
             'Destination': trans_destination,
             'TransportType': trans_type,
