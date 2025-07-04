@@ -107,9 +107,22 @@ st.header("🚆 Transportation Cost Prediction")
 
 
 # Transportation type options
-TRANSPORT_TYPES = ['Flight', 'Train', 'Bus', 'Car rental']
-NATIONALITIES = ['American', 'British', 'Canadian', 'Australian', 'Japanese']
-DESTINATIONS = ['London', 'Paris', 'Tokyo', 'New York', 'Bali']
+TRANSPORT_TYPES = ['Flight', 'Train', 'Bus', 'Car rental', 'Ferry', 'Bike rental', 'Rideshare']
+NATIONALITIES = [
+    'American', 'British', 'Canadian', 'Australian', 'Japanese',
+    'Chinese', 'German', 'French', 'Italian', 'Spanish',
+    'Brazilian', 'Indian', 'Russian', 'South Korean', 'Mexican',
+    'Dutch', 'Swedish', 'Norwegian', 'Swiss', 'Singaporean',
+    'Thai', 'Vietnamese', 'Indonesian', 'Malaysian', 'Emirati'
+]
+DESTINATIONS = [
+    'London', 'Paris', 'Tokyo', 'New York', 'Bali',
+    'Sydney', 'Rome', 'Berlin', 'Barcelona', 'Dubai',
+    'Singapore', 'Hong Kong', 'Bangkok', 'Seoul', 'Istanbul',
+    'Cape Town', 'Rio de Janeiro', 'Toronto', 'Los Angeles', 'Mumbai',
+    'Amsterdam', 'Vienna', 'Prague', 'Athens', 'Cairo',
+    'Reykjavik', 'Hawaii', 'Santorini', 'Phuket', 'Marrakech'
+]
 
 # Load/generate transportation data
 @st.cache_data
