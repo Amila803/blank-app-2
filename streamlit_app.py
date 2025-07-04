@@ -4,20 +4,17 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import holidays
-import joblib
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import joblib
 from datetime import datetime
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.compose import TransformedTargetRegressor
 from lightgbm import LGBMRegressor
-from sklearn.base import BaseEstimator, TransformerMixin
-
 
 
 
@@ -106,83 +103,7 @@ if data is not None:
     NATIONALITIES = sorted(data['TravelerNationality'].dropna().unique().tolist())
     ACCOMMODATION_TYPES = sorted(data['AccommodationType'].dropna().unique().tolist())
     
-# Feature Engineering
-
-    class FeatureEngineer(BaseEstimator, TransformerMixin):
-        def __init__(self):
-            self.holidays_de = holidays.DE()
-    
-        def fit(self, X, y=None):
-            return self
-    
-        def _check_holiday(self, row):
-            date = row['StartDate']
-            return int(date in self.holidays_de)
-    
-        def transform(self, X):
-            # 1st indent level: class = 4 spaces
-            # 2nd indent level: method = +4 spaces = 8 spaces total
-            X = X.copy()
-    
-            # —— Date features ——  
-            if 'StartDate' in X.columns:
-                X['Year']        = X['StartDate'].dt.year
-                X['Month']       = X['StartDate'].dt.month
-                X['Day']         = X['StartDate'].dt.day
-                X['DayOfWeek']   = X['StartDate'].dt.dayofweek
-                X['IsWeekend']   = X['DayOfWeek'].isin([5,6]).astype(int)
-                X['Quarter']     = X['StartDate'].dt.quarter
-                X['DayOfYear']   = X['StartDate'].dt.dayofyear
-                X['WeekOfYear']  = X['StartDate'].dt.isocalendar().week
-                X = X.drop('StartDate', axis=1)
-    
-            # —— Holiday features ——  
-            if 'StartDate' in X.columns and 'TravelerNationality' in X.columns:
-                X['IsHoliday'] = X.apply(self._check_holiday, axis=1)
-    
-            # —— Seasonality flags ——  
-            if 'Month' in X.columns:
-                X['IsPeakSeason']     = X['Month'].isin([6,7,8,12]).astype(int)
-                X['IsShoulderSeason'] = X['Month'].isin([4,5,9,10]).astype(int)
-                X['IsLowSeason']      = X['Month'].isin([1,2,3,11]).astype(int)
-    
-            # —— Duration features ——  
-            if 'Duration' in X.columns:
-                X['LogDuration']  = np.log1p(X['Duration'])
-                X['SqrtDuration'] = np.sqrt(X['Duration'])
-                X['DurationBins'] = pd.cut(
-                    X['Duration'],
-                    bins=[0,3,7,14,30,90],
-                    labels=['0-3','4-7','8-14','15-30','30+']
-                )
-                if 'IsPeakSeason' in X.columns:
-                    X['PeakDuration'] = X['IsPeakSeason'] * X['Duration']
-                if 'IsWeekend' in X.columns:
-                    X['WeekendDuration'] = X['IsWeekend'] * X['Duration']
-
-            return X
-    
-    def _check_holiday(self, row):
-        if 'StartDate' not in row or pd.isna(row['StartDate']):
-            return 0
-        if 'TravelerNationality' not in row:
-            return 0
-            
-        date = row['StartDate']
-        country = row['TravelerNationality']
-        
-        try:
-            if country == 'United States':
-                return date in self.holidays_us
-            elif country == 'United Kingdom':
-                return date in self.holidays_uk
-            elif country == 'Japan':
-                return date in self.holidays_jp
-            elif country == 'Germany':
-                return date in self.holidays_de
-            return 0
-        except:
-            return 0
+    # Feature Engineering
     def engineer_features(df):
         df = df.copy()
         # Extract date features
@@ -217,24 +138,13 @@ if data is not None:
     # Train transportation model
     @st.cache_resource
     def train_transport_model():
-        
-        
         # Feature engineering
-        transport_data = data[['Destination', 'TransportType', 'TravelerNationality', 'TransportCost', 'StartDate']].copy()
-    
-        # Add Duration with a default value if it doesn't exist
-        if 'Duration' not in transport_data.columns:
-            transport_data['Duration'] = 1  # Default duration for transportation
+        transport_data = data[['Destination', 'TransportType', 'TravelerNationality', 'TransportCost']].copy()
+        transport_data['PeakSeason'] = pd.to_datetime(data['StartDate']).dt.month.isin([6,7,8,12]).astype(int)
         
-        transport_data = FeatureEngineer().fit_transform(transport_data)
-
-         # Remove unnecessary columns
-        transport_data = transport_data.drop(['Cost', 'AccommodationType'], axis=1, errors='ignore')
-        
-        X = transport_data.drop('TransportCost', axis=1)
+        X = transport_data[['Destination', 'TransportType', 'TravelerNationality', 'PeakSeason']]
         y = transport_data['TransportCost']
-   
- 
+        
         # Preprocessing
         preprocessor = ColumnTransformer(
             transformers=[
@@ -265,9 +175,7 @@ if data is not None:
         model.fit(X, y)
         return model
 
-
     transport_model = train_transport_model()
-
 
     # Show transportation relationships
     st.subheader("Cost Patterns")
@@ -455,13 +363,13 @@ if data is not None:
         if trans_destination == 'Bali' and trans_type == 'Train':
             st.warning("Limited train options in Bali - consider flights or car rental")
 
-# --- INTEGRATION ---
-st.header("💵 Combined Cost Prediction")
+    # --- INTEGRATION ---
+    st.header("💵 Combined Cost Prediction")
 
-if 'accom_pred' in st.session_state and 'trans_pred' in st.session_state:
-    total_cost = st.session_state['accom_pred'] + st.session_state['trans_pred']
-    st.success(f"## Total Estimated Trip Cost: ${total_cost:.2f}")
-    st.write(f"- Accommodation: ${st.session_state['accom_pred']:.2f}")
-    st.write(f"- Transportation: ${st.session_state['trans_pred']:.2f}")
+    if 'accom_pred' in st.session_state and 'trans_pred' in st.session_state:
+        total_cost = st.session_state['accom_pred'] + st.session_state['trans_pred']
+        st.success(f"## Total Estimated Trip Cost: ${total_cost:.2f}")
+        st.write(f"- Accommodation: ${st.session_state['accom_pred']:.2f}")
+        st.write(f"- Transportation: ${st.session_state['trans_pred']:.2f}")
 else:
-    st.error("Failed to load predictions. Make sure you’ve run both accommodation and transportation models.")
+    st.error("Failed to load dataset. Please check if 'Travel_details_dataset.csv' exists in the same directory.")
