@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -12,11 +11,9 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import joblib
 from datetime import datetime
-from sklearn.model_selection import RandomizedSearchCV, RepeatedKFold
+from sklearn.model_selection import RandomizedSearchCV
 from sklearn.compose import TransformedTargetRegressor
 from lightgbm import LGBMRegressor
-
-
 
 # Set page config
 st.set_page_config(page_title="Travel Cost Predictor", page_icon="✈️", layout="wide")
@@ -67,32 +64,11 @@ def remove_outliers(df, columns):
 @st.cache_data
 def load_data():
     try:
-        # [Previous data loading code remains the same until the end of cleaning]
+        # Load the dataset with proper encoding
+        data = pd.read_csv("Travel_details_dataset.csv", encoding='utf-8-sig')
         
-        # Filter only needed columns and drop rows with missing critical data
-        data = data[[
-            'Destination', 'Duration', 'StartDate', 'AccommodationType',
-            'TravelerNationality', 'Cost', 'TransportType', 'TransportCost'
-        ]].dropna(subset=['Cost', 'TransportCost'])
-        
-        # Remove outliers from numerical columns
-        numerical_cols = ['Duration', 'Cost', 'TransportCost']
-        data_clean, outlier_info = remove_outliers(data, numerical_cols)
-        
-        # Show outlier information
-        if st.checkbox("Show Outlier Removal Information"):
-            st.subheader("Outlier Removal Summary")
-            for col, info in outlier_info.items():
-                st.write(f"**{col}**:")
-                st.write(f"- Removed {info['num_outliers']} outliers ({info['percent_outliers']:.2f}%)")
-                st.write(f"- Lower bound: {info['lower_bound']:.2f}, Upper bound: {info['upper_bound']:.2f}")
-                st.write("---")
-        
-        return data_clean
-    
-    except Exception as e:
-        st.error(f"Error loading dataset: {str(e)}")
-        return None
+        # Remove completely empty rows
+        data = data.dropna(how='all')
         
         # Function to clean currency values
         def clean_currency(value):
@@ -144,7 +120,20 @@ def load_data():
             'TravelerNationality', 'Cost', 'TransportType', 'TransportCost'
         ]].dropna(subset=['Cost', 'TransportCost'])
         
-        return data
+        # Remove outliers from numerical columns
+        numerical_cols = ['Duration', 'Cost', 'TransportCost']
+        data_clean, outlier_info = remove_outliers(data, numerical_cols)
+        
+        # Show outlier information
+        if st.checkbox("Show Outlier Removal Information"):
+            st.subheader("Outlier Removal Summary")
+            for col, info in outlier_info.items():
+                st.write(f"**{col}**:")
+                st.write(f"- Removed {info['num_outliers']} outliers ({info['percent_outliers']:.2f}%)")
+                st.write(f"- Lower bound: {info['lower_bound']:.2f}, Upper bound: {info['upper_bound']:.2f}")
+                st.write("---")
+        
+        return data_clean
     
     except Exception as e:
         st.error(f"Error loading dataset: {str(e)}")
@@ -154,6 +143,21 @@ def load_data():
 data = load_data()
 
 if data is not None:
+    # Show data distribution after outlier removal
+    st.subheader("Data Distribution After Outlier Removal")
+    col1, col2 = st.columns(2)
+    with col1:
+        fig, ax = plt.subplots()
+        sns.boxplot(data=data[['Cost', 'TransportCost']])
+        ax.set_title("Cost Distribution")
+        st.pyplot(fig)
+    
+    with col2:
+        fig, ax = plt.subplots()
+        sns.histplot(data['Duration'], bins=30, kde=True)
+        ax.set_title("Duration Distribution")
+        st.pyplot(fig)
+
     # Update dropdown options based on actual data
     DESTINATIONS = sorted(data['Destination'].unique().tolist())
     TRANSPORT_TYPES = sorted(data['TransportType'].dropna().unique().tolist())
@@ -196,8 +200,8 @@ if data is not None:
     @st.cache_resource
     def train_transport_model():
         # Feature engineering
-        transport_data = data[['Destination', 'TransportType', 'TravelerNationality', 'TransportCost']].copy()
-        transport_data['PeakSeason'] = pd.to_datetime(data['StartDate']).dt.month.isin([6,7,8,12]).astype(int)
+        transport_data = data[['Destination', 'TransportType', 'TravelerNationality', 'TransportCost', 'StartDate']].copy()
+        transport_data['PeakSeason'] = pd.to_datetime(transport_data['StartDate']).dt.month.isin([6,7,8,12]).astype(int)
         
         X = transport_data[['Destination', 'TransportType', 'TravelerNationality', 'PeakSeason']]
         y = transport_data['TransportCost']
@@ -208,16 +212,6 @@ if data is not None:
                 ('cat', OneHotEncoder(handle_unknown='ignore'), ['Destination', 'TransportType', 'TravelerNationality'])
             ])
         
-        base = RandomForestRegressor(random_state=42, n_jobs=-1)
-        model = Pipeline([
-            ('preprocessor', preprocessor),
-            ('regressor', TransformedTargetRegressor(
-                regressor=base,
-                func=np.log1p,
-                inverse_func=np.expm1
-            ))
-        ])
-
         model = Pipeline([
           ('preprocessor', preprocessor),
           ('regressor', LGBMRegressor(
@@ -278,64 +272,54 @@ if data is not None:
 
     # Train model
     if st.button("Train Model"):
-        with st.spinner("Training model…"):
-            # 1) split
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=0.2, random_state=42
+        with st.spinner("Training model..."):
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+            
+            # Hyperparameter tuning
+            param_distributions = {
+                'regressor__n_estimators': [100, 200, 300, 400, 500],
+                'regressor__max_depth': [None, 5, 10, 20, 30],
+                'regressor__min_samples_split': [2, 5, 10, 15],
+                'regressor__min_samples_leaf': [1, 2, 4, 6],
+                'regressor__max_features': ['sqrt', 'log2', None],
+                'regressor__bootstrap': [True, False]
+            }
+            
+            search = RandomizedSearchCV(
+                estimator=model,
+                param_distributions=param_distributions,
+                n_iter=50,
+                cv=5,
+                scoring='neg_mean_absolute_error',
+                n_jobs=-1,
+                random_state=42,
+                verbose=2
             )
+            search.fit(X_train, y_train)
+            
+            best_model = search.best_estimator_
+            st.write("🔑 Best params:", search.best_params_)
+            
+            # Save model
+            joblib.dump(best_model, 'travel_cost_model.pkl')
+            st.success("Model trained and saved!")
 
-        # 2) redefine pipeline to use log-transform + LGBM
-        model = Pipeline([
-            ("preprocessor", preprocessor),  # your existing ColumnTransformer
-            ("regressor", TransformedTargetRegressor(
-                regressor=LGBMRegressor(
-                    random_state=42,
-                    n_jobs=-1
-                ),
-                func=np.log1p,
-                inverse_func=np.expm1
-            ))
-        ])
-
-        # 3) broader hyperparameter distributions
-        param_dist = {
-            "regressor__regressor__n_estimators":       [200, 500, 800, 1200, 2000],
-            "regressor__regressor__learning_rate":      [0.005, 0.01, 0.03, 0.05, 0.1],
-            "regressor__regressor__num_leaves":         [31, 50, 70, 100, 150],
-            "regressor__regressor__max_depth":          [-1, 5, 10, 20, 30],
-            "regressor__regressor__min_child_samples":  [5, 10, 20, 30, 50],
-            "regressor__regressor__subsample":          [0.6, 0.8, 1.0],
-            "regressor__regressor__colsample_bytree":   [0.6, 0.8, 1.0],
-            "regressor__regressor__reg_alpha":          [0, 0.1, 0.5, 1.0],
-            "regressor__regressor__reg_lambda":         [0, 0.1, 0.5, 1.0],
-        }
-
-        # 4) use repeated CV for stability
-        cv = RepeatedKFold(n_splits=5, n_repeats=3, random_state=42)
-
-        search = RandomizedSearchCV(
-            estimator=model,
-            param_distributions=param_dist,
-            n_iter=80,               # try 80 random combos
-            cv=cv,
-            scoring="r2",            # directly optimize R²
-            n_jobs=-1,
-            random_state=42,
-            verbose=1
-        )
-        search.fit(X_train, y_train)
-
-        # 5) report best params & metrics
-        best_model = search.best_estimator_
-        y_pred = best_model.predict(X_test)
-
-        st.write("🔑 Best hyperparameters:", search.best_params_)
-        st.metric("R² (test)", f"{r2_score(y_test, y_pred):.3f}")
-        st.metric("MAE (test)", f"${mean_absolute_error(y_test, y_pred):.2f}")
-
-        # 6) persist your model
-        joblib.dump(best_model, "travel_cost_model.pkl")
-        st.success("Model trained, evaluated, and saved!")
+            # Evaluation
+            st.subheader("Model Evaluation")
+            y_pred = best_model.predict(X_test)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("MAE", f"${mean_absolute_error(y_test, y_pred):.2f}")
+                st.metric("R² Score", f"{r2_score(y_test, y_pred):.2f}")
+            
+            with col2:
+                fig, ax = plt.subplots()
+                ax.scatter(y_test, y_pred, alpha=0.5)
+                ax.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
+                ax.set_xlabel('Actual Cost')
+                ax.set_ylabel('Predicted Cost')
+                st.pyplot(fig)
 
     # Prediction Interface
     st.header("Cost Prediction")
